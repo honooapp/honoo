@@ -27,8 +27,8 @@ void main() {
     );
 
     expect(find.byType(HonooDialogShell), findsOneWidget);
-    expect(find.textContaining('entrato in honoo'), findsOneWidget);
-    expect(find.textContaining('entrato in Honoo'), findsNothing);
+    expect(find.textContaining('registrato su honoo'), findsOneWidget);
+    expect(find.textContaining('registrato su Honoo'), findsNothing);
     expect(find.textContaining('come visualizzatore.'), findsNothing);
     expect(find.textContaining('come visualizzatore'), findsOneWidget);
 
