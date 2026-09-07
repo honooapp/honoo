@@ -7,14 +7,20 @@ import 'reply_notification_signal.dart';
 class RepliesSeenTracker {
   static const _key = 'last_seen_reply_at_v1';
   static const _conversationKey = 'last_seen_reply_by_conversation_v1';
-  static Future<void> _writeQueue = Future<void>.value();
+  static const _replyIdsKey = 'seen_reply_ids_v1';
+  static Future<void>? _writeQueue;
 
   static Future<void> _serializeWrite(Future<void> Function() operation) {
-    final next = _writeQueue.then(
-      (_) => operation(),
-      onError: (_) => operation(),
-    );
-    _writeQueue = next.then<void>((_) {}, onError: (_) {});
+    final pending = _writeQueue;
+    final next = pending == null
+        ? operation()
+        : pending.then((_) => operation(), onError: (_) => operation());
+    _writeQueue = next;
+    void release() {
+      if (identical(_writeQueue, next)) _writeQueue = null;
+    }
+
+    next.then<void>((_) => release(), onError: (_) => release());
     return next;
   }
 
@@ -53,8 +59,26 @@ class RepliesSeenTracker {
     return ReplySeenState(
       baseline: baseline,
       byConversation: Map.unmodifiable(byConversation),
+      replyIds: Set.unmodifiable(
+        prefs.getStringList('${_replyIdsKey}_${userId ?? ''}') ?? const [],
+      ),
     );
   }
+
+  /// Persist the actual displayed reply, even if it is later returned with a
+  /// different conversation association or without its timestamp.
+  static Future<void> markReply({
+    required String userId,
+    required String replyId,
+  }) => _serializeWrite(() async {
+    if (replyId.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final key = '${_replyIdsKey}_$userId';
+    final ids = (prefs.getStringList(key) ?? const <String>[]).toSet();
+    if (!ids.add(replyId)) return;
+    await prefs.setStringList(key, ids.toList());
+    ReplyNotificationSignal.notifyChanged();
+  });
 
   static Future<DateTime?> lastSeen({String? userId}) async {
     final prefs = await SharedPreferences.getInstance();
@@ -103,13 +127,29 @@ class RepliesSeenTracker {
 }
 
 class ReplySeenState {
-  const ReplySeenState({required this.baseline, required this.byConversation});
+  const ReplySeenState({
+    required this.baseline,
+    required this.byConversation,
+    this.replyIds = const {},
+  });
 
   final DateTime? baseline;
   final Map<String, DateTime> byConversation;
+  final Set<String> replyIds;
 
-  bool isSeen({required String conversationId, required DateTime createdAt}) {
-    final threshold = byConversation[conversationId] ?? baseline;
+  bool isSeen({
+    required String conversationId,
+    required DateTime? createdAt,
+    String? replyId,
+  }) {
+    if (replyId != null && replyIds.contains(replyId)) return true;
+    if (createdAt == null) return false;
+    final conversationThreshold = byConversation[conversationId];
+    final threshold =
+        conversationThreshold == null ||
+            (baseline != null && baseline!.isAfter(conversationThreshold))
+        ? baseline
+        : conversationThreshold;
     return threshold != null && !createdAt.isAfter(threshold);
   }
 }

@@ -13,13 +13,13 @@ class HomeService {
       final rows = await Future.wait<dynamic>([
         SupabaseProvider.client
             .from('honoo')
-            .select('created_at,user_id,conversation_id')
+            .select('id,created_at,user_id,conversation_id')
             .eq('destination', 'reply')
             .eq('recipient_tag', userId)
             .neq('user_id', userId),
         SupabaseProvider.client
             .from('hinoo')
-            .select('created_at,user_id,conversation_id')
+            .select('id,created_at,user_id,conversation_id')
             .eq('type', 'answer')
             .eq('recipient_tag', userId)
             .neq('user_id', userId),
@@ -37,6 +37,7 @@ class HomeService {
             !seenState.isSeen(
               conversationId: conversationId,
               createdAt: createdAt,
+              replyId: row['id']?.toString(),
             )) {
           count++;
         }

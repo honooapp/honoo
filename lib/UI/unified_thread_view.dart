@@ -17,6 +17,7 @@ import 'package:honoo/Utility/download_capture.dart';
 import 'package:honoo/Utility/network_image_prefetch.dart';
 import 'package:honoo/Utility/honoo_colors.dart';
 import 'package:honoo/Utility/chest_content_style.dart';
+import 'package:honoo/Utility/replies_seen_tracker.dart';
 // rendering a lista con separatori; rimosso carousel verticale
 
 class UnifiedThreadView extends StatefulWidget {
@@ -73,6 +74,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
   int _loadGeneration = 0;
   String? _loadInProgressFor;
   bool _loadRequested = false;
+  bool _selectionScheduled = false;
   final PageController _pageController = PageController();
   late AnimationController _controller;
   late Animation<double> _liftAnimation;
@@ -268,7 +270,8 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
             _currentPageIndex = selectedPage;
           });
         }
-        widget.onSelect?.call(reversed[selectedPage]);
+        _currentPageIndex = selectedPage;
+        _scheduleSelection();
       }
     } catch (error) {
       if (!mounted ||
@@ -325,6 +328,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
         oldWidget.reconcileInterval != widget.reconcileInterval) {
       _syncSubscription();
       if (widget.isActive && !oldWidget.isActive) {
+        _scheduleSelection();
         _load();
       } else if (!widget.isActive && oldWidget.isActive) {
         _revealedEntryKey = null;
@@ -335,6 +339,54 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
       _revealedEntryKey = null;
       _appliedFocusKey = null;
       _showLatestReceivedAndReveal(forceFocus: true);
+    }
+  }
+
+  void _scheduleSelection() {
+    if (_selectionScheduled) return;
+    _selectionScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _selectionScheduled = false;
+      if (!mounted || !widget.isActive || _entries.isEmpty) return;
+      final entry = _entries.reversed.elementAt(
+        _currentPageIndex.clamp(0, _entries.length - 1),
+      );
+      widget.onSelect?.call(entry);
+      final userId =
+          widget.currentUserId ?? SupabaseProvider.client.auth.currentUser?.id;
+      if (userId == null ||
+          entry.ownerId == null ||
+          entry.ownerId == userId ||
+          ModalRoute.of(context)?.isCurrent == false ||
+          !_isReceivedReply(entry)) {
+        return;
+      }
+      unawaited(_markDisplayedReply(entry, userId));
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  Future<void> _markDisplayedReply(
+    ConversationEntry entry,
+    String userId,
+  ) async {
+    try {
+      if (entry.id?.isNotEmpty == true) {
+        await RepliesSeenTracker.markReply(userId: userId, replyId: entry.id!);
+      }
+      if (entry.createdAt.millisecondsSinceEpoch > 0) {
+        final conversationId =
+            entry.honoo?.conversationId ??
+            entry.hinoo?.conversationId ??
+            widget.conversationId;
+        await RepliesSeenTracker.markAt(
+          entry.createdAt,
+          userId: userId,
+          conversationId: conversationId,
+        );
+      }
+    } catch (error) {
+      debugPrint('Unable to persist displayed reply: $error');
     }
   }
 
@@ -500,7 +552,10 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
         break;
     }
     return ColoredBox(
-      key: keyName == null ? null : Key(keyName),
+      key: Key(
+        keyName ??
+            'conversation-entry-background:${entry.kind.name}:${entry.id}',
+      ),
       color: style.backgroundColor,
       child: SizedBox.expand(
         child: SavedContentEditFrame(
@@ -579,7 +634,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
             _prefetchEntriesFrom(index);
             final reversed = _entries.reversed.toList(growable: false);
             if (index >= 0 && index < reversed.length) {
-              widget.onSelect?.call(reversed[index]);
+              _scheduleSelection();
             }
           },
           itemCount: _entries.length,

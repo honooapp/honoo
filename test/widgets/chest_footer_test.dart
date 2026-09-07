@@ -104,6 +104,42 @@ void main() {
     );
   }
 
+  testWidgets(
+    'le azioni restano ferme durante caricamento e cambio selezione',
+    (tester) async {
+      final item = honooItem(
+        HonooType.personal,
+        conversationId: 'conversation',
+      );
+      await pumpFooter(tester, item: item);
+      final home = tester.getCenter(find.byTooltip('Home'));
+      final info = tester.getCenter(find.byTooltip('Info'));
+      final delete = tester.getCenter(find.byTooltip('Cancella'));
+      final reply = Honoo(
+        0,
+        'reply',
+        '',
+        '',
+        '',
+        'another-user',
+        HonooType.answer,
+      )..dbId = 'reply';
+      await pumpFooter(
+        tester,
+        item: item,
+        selectedConversationEntry: ConversationEntry.honoo(reply),
+      );
+      expect(find.byTooltip('Rispondi'), findsOneWidget);
+      expect(tester.getCenter(find.byTooltip('Home')), home);
+      expect(tester.getCenter(find.byTooltip('Info')), info);
+      expect(tester.getCenter(find.byTooltip('Cancella')), delete);
+      await pumpFooter(tester, item: null);
+      expect(tester.getCenter(find.byTooltip('Home')), home);
+      expect(tester.getCenter(find.byTooltip('Info')), info);
+      expect(find.byTooltip('Rispondi'), findsNothing);
+    },
+  );
+
   testWidgets('footer vuoto mostra subito Home e Info bianche', (tester) async {
     await pumpFooter(tester, item: null);
 

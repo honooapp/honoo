@@ -12,6 +12,7 @@ class ResponsiveFooterAction {
   final ColorFilter? colorFilter;
   final double? splashRadius;
   final Widget? icon;
+  final bool visible;
 
   const ResponsiveFooterAction({
     required this.asset,
@@ -22,6 +23,7 @@ class ResponsiveFooterAction {
     this.colorFilter,
     this.splashRadius,
     this.icon,
+    this.visible = true,
   });
 }
 
@@ -142,6 +144,7 @@ class _FooterIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!action.visible) return SizedBox.square(dimension: size);
     final Widget iconWidget = action.icon == null
         ? SvgPicture.asset(
             action.asset,

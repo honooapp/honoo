@@ -83,7 +83,24 @@ class ChestFooter extends StatelessWidget {
       desiredGap: gap,
       minGap: 16,
       height: iconSize,
-      actions: actions,
+      // Reserve each action's position while the selected thread is loading.
+      // Hidden slots have no button, tooltip or accessibility action.
+      actions: [
+        for (final tooltip in const [
+          'Home',
+          'Info',
+          'Spedisci sulla Luna',
+          'Cancella',
+          'Rispondi',
+        ])
+          actions.where((action) => action.tooltip == tooltip).firstOrNull ??
+              ResponsiveFooterAction(
+                asset: '',
+                size: iconSize,
+                tooltip: tooltip,
+                visible: false,
+              ),
+      ],
     );
   }
 

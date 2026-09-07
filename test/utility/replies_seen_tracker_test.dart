@@ -5,6 +5,55 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  test(
+    'ricarica gli id letti senza dipendere da data o conversazione',
+    () async {
+      await RepliesSeenTracker.markReply(userId: 'user-1', replyId: 'reply-1');
+      final state = await RepliesSeenTracker.load(userId: 'user-1');
+      expect(
+        state.isSeen(
+          conversationId: 'changed',
+          createdAt: null,
+          replyId: 'reply-1',
+        ),
+        isTrue,
+      );
+      expect(
+        state.isSeen(
+          conversationId: 'changed',
+          createdAt: null,
+          replyId: 'reply-2',
+        ),
+        isFalse,
+      );
+      final other = await RepliesSeenTracker.load(userId: 'user-2');
+      expect(other.replyIds, isEmpty);
+    },
+  );
+
+  test(
+    'un vecchio cursore locale non annulla il cursore globale più recente',
+    () async {
+      await RepliesSeenTracker.markAt(
+        DateTime.utc(2026, 8, 1),
+        userId: 'user-1',
+        conversationId: 'conversation-1',
+      );
+      await RepliesSeenTracker.markAt(
+        DateTime.utc(2026, 8, 3),
+        userId: 'user-1',
+      );
+      final state = await RepliesSeenTracker.load(userId: 'user-1');
+      expect(
+        state.isSeen(
+          conversationId: 'conversation-1',
+          createdAt: DateTime.utc(2026, 8, 2),
+        ),
+        isTrue,
+      );
+    },
+  );
+
   test('mantiene un cursore separato per ogni utente', () async {
     final firstSeen = DateTime.parse('2026-08-03T10:00:00Z');
     final secondSeen = DateTime.parse('2026-08-03T11:00:00Z');

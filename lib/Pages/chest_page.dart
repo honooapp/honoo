@@ -10,7 +10,6 @@ import 'package:honoo/Services/chest_hint_service.dart';
 import 'package:honoo/Services/duplication_result.dart';
 import 'package:honoo/Services/hinoo_service.dart';
 import 'package:honoo/Services/honoo_service.dart';
-import 'package:honoo/Services/reply_system_notification.dart';
 import 'package:honoo/Services/auth_navigation_service.dart';
 
 import '../Controller/honoo_controller.dart';
@@ -29,7 +28,6 @@ import '../Utility/honoo_colors.dart';
 import '../Utility/chest_content_style.dart';
 import '../Utility/responsive_layout.dart';
 import '../Utility/network_image_prefetch.dart';
-import '../Utility/replies_seen_tracker.dart';
 
 import '../Widgets/honoo_dialogs.dart';
 import '../Widgets/gallery_save_dialog.dart';
@@ -89,8 +87,6 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
   final DownloadCaptureService _downloadCaptureService =
       DownloadCaptureService();
   final ChestHintService _chestHintService = ChestHintService();
-  final ReplySystemNotification _replySystemNotification =
-      ReplySystemNotification.platform();
 
   int _currentIndex = 0;
   bool _didApplyInitialFocus = false;
@@ -118,6 +114,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
   Map<String, List<HinooThreadEntry>> get _hinooRepliesByRoot =>
       _chestController.value.hinooRepliesByRoot;
   ConversationEntry? _selectedConvEntry;
+  final Map<String, ConversationEntry> _selectedEntriesByConversation = {};
   bool get _isHinooLoading => _chestController.value.isHinooLoading;
   final cs.CarouselSliderController _carouselController =
       cs.CarouselSliderController();
@@ -141,30 +138,16 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     String? conversationId,
     ConversationEntry entry,
   ) {
+    if (conversationId != null) {
+      _selectedEntriesByConversation[conversationId] = entry;
+      final visibleConversationId = _detachedConversationVisible
+          ? widget.focusConversationId ?? _detachedFocusedConversationId
+          : _itemsNormal.isEmpty
+          ? null
+          : _convIdOfItem(_itemsNormal[_currentIndex]);
+      if (conversationId != visibleConversationId) return;
+    }
     setState(() => _selectedConvEntry = entry);
-    final currentUserId = SupabaseProvider.client.auth.currentUser?.id;
-    final isReply =
-        entry.honoo?.type == HonooType.answer ||
-        entry.hinoo?.type == HinooType.answer;
-    if (!isReply ||
-        currentUserId == null ||
-        entry.ownerId == currentUserId ||
-        entry.createdAt.millisecondsSinceEpoch <= 0) {
-      return;
-    }
-    if (conversationId != null && conversationId.isNotEmpty) {
-      _replySystemNotification.closeConversation(conversationId);
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      unawaited(
-        RepliesSeenTracker.markAt(
-          entry.createdAt,
-          userId: currentUserId,
-          conversationId: conversationId,
-        ),
-      );
-    });
   }
 
   @override
@@ -1247,7 +1230,11 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
                     if (!isDetachedPage) {
                       _currentIndex = i - detachedOffset;
                     }
-                    _selectedConvEntry = null;
+                    final conversationId = isDetachedPage
+                        ? focusedConversationId
+                        : _convIdOfItem(items[_currentIndex]);
+                    _selectedConvEntry =
+                        _selectedEntriesByConversation[conversationId];
                   });
                   if (!isDetachedPage) {
                     _prefetchChestFrom(i - detachedOffset);

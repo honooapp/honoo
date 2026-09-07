@@ -216,6 +216,38 @@ void main() {
     expect(find.text('Hai ricevuto una nuova risposta'), findsNothing);
   });
 
+  testWidgets('un nuovo listener non rinotifica un id letto senza timestamp', (
+    tester,
+  ) async {
+    await RepliesSeenTracker.markReply(userId: 'test_user', replyId: 'seen-id');
+    final navigatorKey = GlobalKey<NavigatorState>();
+    final notification = _FakeReplySystemNotification();
+    await tester.pumpWidget(
+      GlobalReplyNotificationListener(
+        navigatorKey: navigatorKey,
+        systemNotification: notification,
+        replyEventStream: events.stream,
+        child: MaterialApp(
+          navigatorKey: navigatorKey,
+          home: const Scaffold(body: Text('Home')),
+        ),
+      ),
+    );
+    events.add(
+      const ReplyNotificationEvent(
+        kind: ReplyNotificationKind.honoo,
+        conversationId: 'changed-conversation',
+        senderId: 'other_user',
+        recipientId: 'test_user',
+        replyId: 'seen-id',
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
+    expect(notification.showCount, 0);
+    expect(find.text('Hai ricevuto una nuova risposta'), findsNothing);
+  });
+
   testWidgets('visualizzare una risposta chiude la sua notifica attiva', (
     tester,
   ) async {

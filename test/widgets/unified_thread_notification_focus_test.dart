@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:honoo/Entities/conversation_entry.dart';
 import 'package:honoo/Entities/honoo.dart';
 import 'package:honoo/UI/unified_thread_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../test_supabase_helper.dart';
 
@@ -11,6 +12,7 @@ void main() {
 
   late SupabaseTestHarness harness;
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     harness = SupabaseTestHarness(withAuthenticatedUser: true)
       ..enableOverrides();
   });

@@ -24,6 +24,87 @@ void main() {
 
   tearDown(() => harness.disableOverrides());
 
+  testWidgets(
+    'il contenitore non mantiene il rosso della radice su una risposta propria',
+    (tester) async {
+      final root =
+          Honoo(
+              0,
+              'Ricevuto',
+              '',
+              '2026-07-25T10:00:00Z',
+              '',
+              'other_user',
+              HonooType.answer,
+            )
+            ..dbId = 'root'
+            ..conversationId = 'thread';
+      final own =
+          Honoo(
+              0,
+              'Mio',
+              '',
+              '2026-07-25T11:00:00Z',
+              '',
+              'test_user',
+              HonooType.answer,
+            )
+            ..dbId = 'own'
+            ..conversationId = 'thread';
+      harness.stubTable('honoo').queueResponse([
+        root.toMap()..['id'] = 'root',
+        own.toMap()..['id'] = 'own',
+      ]);
+      harness.stubTable('hinoo');
+      harness.stubTable('conversation_tombstones');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChestItemView(
+              item: ChestItem.honoo(root, DateTime.utc(2026, 7, 25)),
+              availableHeight: 600,
+              maxWidth: 800,
+              honooMetrics: ResponsiveLayout.honooBuilderMetrics(
+                availableHeight: 600,
+                maxWidth: 800,
+                mode: ResponsiveLayoutMode.desktop,
+              ),
+              repaintKey: GlobalKey(),
+              hinooRepliesByRoot: const {},
+              isNormalMode: true,
+              isActive: false,
+              highlightLatest: false,
+              focusConversationId: null,
+              revealEntryId: null,
+              onSelectConversationEntry: (_) {},
+              onDownload: (_) {},
+              conversationRefreshToken: 0,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final backgrounds = tester.widgetList<ColoredBox>(
+        find.ancestor(
+          of: find.byType(UnifiedThreadView),
+          matching: find.byType(ColoredBox),
+        ),
+      );
+      expect(backgrounds, isNotEmpty);
+      expect(
+        backgrounds.every((box) => box.color == Colors.transparent),
+        isTrue,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(ChestItemView),
+          matching: find.byType(AnimatedSwitcher),
+        ),
+        findsNothing,
+      );
+    },
+  );
+
   testWidgets('un Honoo singolo non usa viste o transizioni di conversazione', (
     tester,
   ) async {

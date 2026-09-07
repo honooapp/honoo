@@ -101,7 +101,7 @@ class ChestItemView extends StatelessWidget {
     final keyedCard = KeyedSubtree(
       key: ValueKey(identity),
       child: ColoredBox(
-        color: pageStyle.backgroundColor,
+        color: isConversation ? Colors.transparent : pageStyle.backgroundColor,
         child: SizedBox(width: maxWidth, height: availableHeight, child: card),
       ),
     );
@@ -117,10 +117,7 @@ class ChestItemView extends StatelessWidget {
         child: keyedCard,
       );
     }
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 250),
-      child: keyedCard,
-    );
+    return keyedCard;
   }
 
   Widget _buildHonoo(Honoo honoo) {

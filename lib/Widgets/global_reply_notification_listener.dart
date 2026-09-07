@@ -268,16 +268,13 @@ class _GlobalReplyNotificationListenerState
     final states = <String, ReplySeenState>{};
     for (final event in events) {
       final createdAt = event.createdAt;
-      if (createdAt == null) {
-        result.add(event);
-        continue;
-      }
       final state = states[event.recipientId] ??= await RepliesSeenTracker.load(
         userId: event.recipientId,
       );
       if (!state.isSeen(
         conversationId: event.conversationId,
         createdAt: createdAt,
+        replyId: event.replyId,
       )) {
         result.add(event);
       }
@@ -389,6 +386,7 @@ class _GlobalReplyNotificationListenerState
               !seenState.isSeen(
                 conversationId: event.conversationId,
                 createdAt: createdAt,
+                replyId: event.replyId,
               )) {
             pending.add(event);
           }
