@@ -15,6 +15,7 @@ void main() {
           'kind': 'honoo',
           'data': {
             'id': 'honoo-1',
+            'conversation_id': 'honoo-thread',
             'text': 'Honoo condiviso',
             'image_url': '',
             'destination': 'chest',
@@ -28,11 +29,9 @@ void main() {
           'kind': 'hinoo',
           'data': {
             'id': 'hinoo-1',
+            'conversation_id': 'hinoo-thread',
             'pages': [
-              {
-                'text': 'Hinoo condiviso',
-                'backgroundImage': '',
-              },
+              {'text': 'Hinoo condiviso', 'backgroundImage': ''},
             ],
             'type': 'personal',
             'created_at': '2026-08-11T10:00:00Z',
@@ -41,20 +40,27 @@ void main() {
           },
         },
       ]);
-    when(() => harness.client.rpc(
-          'get_shared_house_chest',
-          params: any(named: 'params'),
-        )).thenAnswer((_) => rpc);
+    when(
+      () => harness.client.rpc(
+        'get_shared_house_chest',
+        params: any(named: 'params'),
+      ),
+    ).thenAnswer((_) => rpc);
 
-    final items = await HouseSharedContentService(client: harness.client)
-        .fetch('owner-1');
+    final items = await HouseSharedContentService(
+      client: harness.client,
+    ).fetch('owner-1');
 
     expect(items, hasLength(2));
     expect(items.first.hinoo?.id, 'hinoo-1');
     expect(items.last.honoo?.dbId, 'honoo-1');
-    verify(() => harness.client.rpc(
-          'get_shared_house_chest',
-          params: {'p_owner_id': 'owner-1'},
-        )).called(1);
+    expect(items.last.honoo?.conversationId, 'honoo-thread');
+    expect(items.first.hinoo?.conversationId, 'hinoo-thread');
+    verify(
+      () => harness.client.rpc(
+        'get_shared_house_chest',
+        params: {'p_owner_id': 'owner-1'},
+      ),
+    ).called(1);
   });
 }
