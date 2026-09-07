@@ -67,6 +67,7 @@ void main() {
     ValueChanged<ConversationEntry>? onReplyToConversationEntry,
     ValueChanged<ConversationEntry>? onSendConversationEntryToMoon,
     Color foregroundColor = HonooColor.onBackground,
+    bool isAdmin = false,
     double width = 800,
     double iconSize = 40,
   }) async {
@@ -78,6 +79,7 @@ void main() {
               width: width,
               child: ChestFooter(
                 item: item,
+                isAdmin: isAdmin,
                 selectedConversationEntry: selectedConversationEntry,
                 currentUserId: 'current-user',
                 iconSize: iconSize,
@@ -114,7 +116,7 @@ void main() {
       await pumpFooter(tester, item: item);
       final home = tester.getCenter(find.byTooltip('Home'));
       final info = tester.getCenter(find.byTooltip('Info'));
-      final delete = tester.getCenter(find.byTooltip('Cancella'));
+      expect(find.byTooltip('Cancella'), findsNothing);
       final reply = Honoo(
         0,
         'reply',
@@ -132,13 +134,36 @@ void main() {
       expect(find.byTooltip('Rispondi'), findsOneWidget);
       expect(tester.getCenter(find.byTooltip('Home')), home);
       expect(tester.getCenter(find.byTooltip('Info')), info);
-      expect(tester.getCenter(find.byTooltip('Cancella')), delete);
+      expect(find.byTooltip('Cancella'), findsNothing);
       await pumpFooter(tester, item: null);
       expect(tester.getCenter(find.byTooltip('Home')), home);
       expect(tester.getCenter(find.byTooltip('Info')), info);
       expect(find.byTooltip('Rispondi'), findsNothing);
     },
   );
+
+  testWidgets('solo gli admin possono cancellare conversazioni Honoo e Hinoo', (
+    tester,
+  ) async {
+    for (final item in [
+      honooItem(HonooType.personal, conversationId: 'thread'),
+      honooItem(HonooType.personal, hasReplies: true),
+      hinooItem(conversationId: 'thread'),
+    ]) {
+      await pumpFooter(tester, item: item);
+      expect(find.byTooltip('Cancella'), findsNothing);
+      var deleted = false;
+      await pumpFooter(
+        tester,
+        item: item,
+        isAdmin: true,
+        onDeleteHonoo: (_) => deleted = true,
+        onDeleteHinoo: (_) => deleted = true,
+      );
+      await tester.tap(find.byTooltip('Cancella'));
+      expect(deleted, isTrue);
+    }
+  });
 
   testWidgets('footer vuoto mostra subito Home e Info bianche', (tester) async {
     await pumpFooter(tester, item: null);
@@ -189,7 +214,7 @@ void main() {
     expect(find.byTooltip('Vedi risposte'), findsNothing);
     expect(find.byTooltip('Rispondi'), findsNothing);
     expect(find.byTooltip('Spedisci sulla Luna'), findsOneWidget);
-    expect(find.byType(IconButton), findsNWidgets(4));
+    expect(find.byType(IconButton), findsNWidgets(3));
   });
 
   testWidgets('Honoo personale mostra Luna e Cancella e inoltra le azioni', (
@@ -483,7 +508,7 @@ void main() {
       iconSize: 60,
     );
 
-    expect(find.byType(IconButton), findsNWidgets(5));
+    expect(find.byType(IconButton), findsNWidgets(4));
     expect(tester.takeException(), isNull);
   });
 
@@ -513,15 +538,15 @@ void main() {
     expect(find.byTooltip('Spedisci sulla Luna'), findsNothing);
   });
 
-  testWidgets('contenuto ricevuto mostra solo Home, Info e Cancella', (
+  testWidgets('contenuto ricevuto non permette la cancellazione agli utenti', (
     tester,
   ) async {
     await pumpFooter(tester, item: honooItem(HonooType.answer));
 
-    expect(find.byType(IconButton), findsNWidgets(3));
+    expect(find.byType(IconButton), findsNWidgets(2));
     expect(find.byTooltip('Home'), findsOneWidget);
     expect(find.byTooltip('Info'), findsOneWidget);
-    expect(find.byTooltip('Cancella'), findsOneWidget);
+    expect(find.byTooltip('Cancella'), findsNothing);
     expect(find.byTooltip('Spedisci sulla Luna'), findsNothing);
     expect(find.byTooltip('Rispondi'), findsNothing);
   });

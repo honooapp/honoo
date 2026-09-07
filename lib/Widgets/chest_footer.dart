@@ -27,8 +27,12 @@ class ChestFooter extends StatelessWidget {
     required this.onReplyToConversationEntry,
     required this.onSendConversationEntryToMoon,
     this.foregroundColor = HonooColor.onBackground,
+    this.isAdmin = false,
+    this.isConversation = false,
   });
 
+  final bool isAdmin;
+  final bool isConversation;
   final ChestItem? item;
   final ConversationEntry? selectedConversationEntry;
   final String? currentUserId;
@@ -119,7 +123,14 @@ class ChestFooter extends StatelessWidget {
       actions.add(_replyAction(() => onReplyToHonoo(honoo)));
     }
 
-    actions.add(_deleteAction(() => onDeleteHonoo(honoo)));
+    if (isAdmin ||
+        !(isConversation ||
+            selectedConversationEntry != null ||
+            honoo.conversationId?.isNotEmpty == true ||
+            honoo.hasReplies ||
+            honoo.type == HonooType.answer)) {
+      actions.add(_deleteAction(() => onDeleteHonoo(honoo)));
+    }
 
     if (selectedEntryToPublish != null) {
       if (selectedEntryToPublish.id == honoo.dbId) {
@@ -176,7 +187,14 @@ class ChestFooter extends StatelessWidget {
     } else if (isFromMoonSaved) {
       actions.add(_replyAction(() => onReplyToHinoo(hinoo)));
     }
-    actions.add(_deleteAction(() => onDeleteHinoo(hinoo)));
+    if (isAdmin ||
+        !(isConversation ||
+            selectedConversationEntry != null ||
+            hinoo.conversationId?.isNotEmpty == true ||
+            hinoo.draft.conversationId?.isNotEmpty == true ||
+            hinoo.draft.type == HinooType.answer)) {
+      actions.add(_deleteAction(() => onDeleteHinoo(hinoo)));
+    }
 
     if (selectedEntryToPublish != null) {
       if (selectedEntryToPublish.id == hinoo.id) {

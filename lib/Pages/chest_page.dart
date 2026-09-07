@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:carousel_slider/carousel_slider.dart' as cs;
 import 'package:honoo/Services/supabase_provider.dart';
 import 'package:honoo/Services/chest_repository.dart';
+import 'package:honoo/Services/admin_service.dart';
 import 'package:honoo/Services/download_capture_service.dart';
 import 'package:honoo/Services/chest_hint_service.dart';
 import 'package:honoo/Services/duplication_result.dart';
@@ -98,6 +99,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
   String? _pendingRevealEntryId;
   Object? _honooLoadError;
   bool _isMutating = false;
+  bool _isAdmin = false;
   bool _isReconciling = false;
   bool _reconcilePending = false;
   // Data lists for normal vs conversation mode
@@ -169,6 +171,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
       return;
     }
     setState(() => _authResolved = true);
+    unawaited(_loadAdminStatus());
     unawaited(_initialize());
     _maybeShowScrignoHint();
   }
@@ -243,6 +246,11 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
         });
       }
     }
+  }
+
+  Future<void> _loadAdminStatus() async {
+    final isAdmin = await AdminService().isCurrentUserAdmin();
+    if (mounted) setState(() => _isAdmin = isAdmin);
   }
 
   Future<void> _initialize() async {
@@ -532,6 +540,9 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     final conversationId = _conversationIdForDeletion(item);
     final userId = SupabaseProvider.client.auth.currentUser?.id;
     if (conversationId == null || userId == null) return false;
+    if (!_isAdmin) {
+      throw StateError('Solo gli admin possono eliminare conversazioni.');
+    }
     await _chestRepository.hideConversation(
       userId: userId,
       conversationId: conversationId,
@@ -576,6 +587,9 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
         ignoring: _isMutating,
         child: ChestFooter(
           item: item,
+          isAdmin: _isAdmin,
+          isConversation:
+              item != null && _conversationIdForDeletion(item) != null,
           selectedConversationEntry: _selectedConvEntry,
           currentUserId: SupabaseProvider.client.auth.currentUser?.id,
           iconSize: iconSize,
@@ -626,6 +640,15 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
   }
 
   Future<void> _deleteHonoo(Honoo honoo) async {
+    if (!_isAdmin &&
+        (_selectedConvEntry != null ||
+            honoo.type == HonooType.answer ||
+            _conversationIdForDeletion(
+                  ChestItem.honoo(honoo, DateTime(1970)),
+                ) !=
+                null)) {
+      return;
+    }
     final confirmed = await showHonooDeleteDialog(
       context,
       target: HonooDeletionTarget.honoo,
@@ -740,6 +763,12 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
   }
 
   Future<void> _deleteHinoo(ChestHinooItem current) async {
+    if (!_isAdmin &&
+        (_selectedConvEntry != null ||
+            current.draft.type == HinooType.answer ||
+            _conversationIdForDeletion(ChestItem.hinoo(current)) != null)) {
+      return;
+    }
     final bool? confirmed = await showHonooDeleteDialog(
       context,
       target: HonooDeletionTarget.hinoo,

@@ -404,7 +404,7 @@ class _NewHinooPageState extends State<NewHinooPage>
           barrierDismissible: true,
           builder: (_) => const HonooConfirmDialog(
             title: "L'hinoo è stato salvato nel tuo Scrigno.",
-            message: 'Vuoi spedirlo anche sulla Luna, per mostrarlo a tutti?',
+            message: 'Vuoi spedirlo anche sulla Luna,\nper mostrarlo a tutti?',
             confirmLabel: 'Sì',
             cancelLabel: 'No',
           ),

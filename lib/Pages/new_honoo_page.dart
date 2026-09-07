@@ -123,7 +123,7 @@ class _NewHonooPageState extends State<NewHonooPage> {
       context: context,
       builder: (_) => const HonooConfirmDialog(
         title: "L'honoo è stato salvato nel tuo Scrigno.",
-        message: "Vuoi spedirlo anche sulla Luna, per mostrarlo a tutti?",
+        message: "Vuoi spedirlo anche sulla Luna,\nper mostrarlo a tutti?",
         confirmLabel: "Sì",
         cancelLabel: "No",
       ),
