@@ -41,9 +41,10 @@ class StorieStorieAccessDialog extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Su Google usa la stessa email con cui sei entrato in honoo. '
-                'Nella pagina del documento premi “Richiedi accesso”: '
-                'Venceslao riceverà la richiesta e potrà autorizzarti come visualizzatore',
+                'Su Google Drive usa la stessa mail/n'
+                    'con cui ti sei registrato su honoo/n'
+                    'Poi clicca su Richiedi accesso/n'
+                    'Venceslao ti autorizzerà/n come visualizzatore',
                 style: _textStyle(fontSize: 14, color: Colors.white70),
                 textAlign: TextAlign.center,
               ),
