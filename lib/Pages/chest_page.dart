@@ -149,6 +149,11 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
           : _convIdOfItem(_itemsNormal[_currentIndex]);
       if (conversationId != visibleConversationId) return;
     }
+    if (_selectedConvEntry?.id == entry.id &&
+        identical(_selectedConvEntry?.honoo, entry.honoo) &&
+        identical(_selectedConvEntry?.hinoo, entry.hinoo)) {
+      return;
+    }
     setState(() => _selectedConvEntry = entry);
   }
 
@@ -464,6 +469,13 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
       }
       final indexChanged = desiredIndex != _currentIndex;
       _currentIndex = desiredIndex;
+      final visibleConversationId = _detachedConversationVisible
+          ? widget.focusConversationId ?? _detachedFocusedConversationId
+          : _itemsNormal.isEmpty
+          ? null
+          : _convIdOfItem(_itemsNormal[_currentIndex]);
+      _selectedConvEntry =
+          _selectedEntriesByConversation[visibleConversationId];
       if (indexChanged) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || _itemsNormal.isEmpty) return;
@@ -818,7 +830,11 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
       final link = ConversationLink.fromParent(
         parentId: replyTo,
         parentConversationId: current.conversationId,
-        recipientId: current.userId,
+        recipientId: ConversationLink.recipientForParent(
+          ownerId: current.userId,
+          parentRecipientId: current.recipientTag,
+          currentUserId: SupabaseProvider.client.auth.currentUser?.id,
+        ),
       );
       final result = await Navigator.push<Object?>(
         context,
@@ -841,8 +857,11 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     final _ReplyChoice? choice = await _showReplyChoice();
     if (choice == null || !mounted) return;
     if (choice == _ReplyChoice.honoo) {
-      final String recipient =
-          current.ownerId ?? current.draft.recipientTag ?? '';
+      final String recipient = ConversationLink.recipientForParent(
+        ownerId: current.ownerId ?? '',
+        parentRecipientId: current.draft.recipientTag,
+        currentUserId: SupabaseProvider.client.auth.currentUser?.id,
+      );
       if (recipient.isEmpty) return;
       final link = ConversationLink.fromParent(
         parentId: current.id,
@@ -877,8 +896,11 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
       );
       _refreshConversationInPlace(result);
     } else {
-      final String recipient =
-          current.ownerId ?? current.draft.recipientTag ?? '';
+      final String recipient = ConversationLink.recipientForParent(
+        ownerId: current.ownerId ?? '',
+        parentRecipientId: current.draft.recipientTag,
+        currentUserId: SupabaseProvider.client.auth.currentUser?.id,
+      );
       if (recipient.isEmpty) return;
       final link = ConversationLink.fromParent(
         parentId: current.id,
@@ -1101,6 +1123,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
 
     final GlobalKey repaintKey = _keyFor(identity);
     return ChestItemView(
+      key: ValueKey(_slideIdentity(item)),
       onSaved: _loadAll,
       item: item,
       availableHeight: availableCenterH,

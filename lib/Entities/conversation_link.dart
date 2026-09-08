@@ -11,6 +11,15 @@ class ConversationLink {
   final String conversationId;
   final String recipientId;
 
+  /// Continuing an outgoing message addresses the original interlocutor.
+  static String recipientForParent({
+    required String ownerId,
+    required String? parentRecipientId,
+    required String? currentUserId,
+  }) => ownerId == currentUserId && parentRecipientId?.isNotEmpty == true
+      ? parentRecipientId!
+      : ownerId;
+
   factory ConversationLink.fromParent({
     required String parentId,
     required String? parentConversationId,

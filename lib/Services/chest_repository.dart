@@ -60,7 +60,9 @@ class ChestRepository {
             'id,pages,type,reply_to,recipient_tag,created_at,is_from_moon_saved,user_id,conversation_id',
           )
           .in_('type', ['personal', 'answer'])
-          .or('user_id.eq.$userId,and(type.eq.answer,recipient_tag.eq.$userId)')
+          .or(
+            'user_id.eq.$userId,and(recipient_tag.eq.$userId,or(type.eq.answer,reply_to.not.is.null,conversation_id.not.is.null))',
+          )
           .order('created_at', ascending: false);
       return _withoutHiddenConversations(rows, hidden);
     } on PostgrestException catch (error) {
@@ -74,7 +76,9 @@ class ChestRepository {
             'id,pages,type,reply_to,recipient_tag,created_at,user_id,conversation_id',
           )
           .in_('type', ['personal', 'answer'])
-          .or('user_id.eq.$userId,and(type.eq.answer,recipient_tag.eq.$userId)')
+          .or(
+            'user_id.eq.$userId,and(recipient_tag.eq.$userId,or(type.eq.answer,reply_to.not.is.null,conversation_id.not.is.null))',
+          )
           .order('created_at', ascending: false);
       return _withoutHiddenConversations(rows, hidden);
     }

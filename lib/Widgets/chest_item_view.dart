@@ -98,8 +98,16 @@ class ChestItemView extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: SizedBox(width: cardWidth, child: content),
           );
+    final threadId = item.when(
+      honoo: (h) => h.conversationId,
+      hinoo: (h) => h.conversationId ?? h.draft.conversationId,
+    );
     final keyedCard = KeyedSubtree(
-      key: ValueKey(identity),
+      key: ValueKey(
+        isConversation && threadId?.isNotEmpty == true
+            ? 'conversation:$threadId'
+            : identity,
+      ),
       child: ColoredBox(
         color: isConversation ? Colors.transparent : pageStyle.backgroundColor,
         child: SizedBox(width: maxWidth, height: availableHeight, child: card),
@@ -157,6 +165,18 @@ class ChestItemView extends StatelessWidget {
     }
     return HinooThreadView(
       root: hinoo.draft,
+      rootId: hinoo.id,
+      onSelect: (entry) {
+        if (!isActive) return;
+        onSelectConversationEntry(
+          ConversationEntry.hinoo(
+            entry.draft,
+            createdAt: entry.createdAt ?? hinoo.createdAt,
+            ownerId: entry.authorId,
+            id: entry.id,
+          ),
+        );
+      },
       rootAuthorId: hinoo.ownerId,
       replies: replies,
       maxHeight: cardHeight,

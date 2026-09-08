@@ -34,7 +34,7 @@ void main() {
     verify(() => hinoo.in_('type', ['personal', 'answer'])).called(1);
     verify(
       () => hinoo.or(
-        'user_id.eq.user-1,and(type.eq.answer,recipient_tag.eq.user-1)',
+        'user_id.eq.user-1,and(recipient_tag.eq.user-1,or(type.eq.answer,reply_to.not.is.null,conversation_id.not.is.null))',
       ),
     ).called(1);
     verify(() => hinoo.order('created_at', ascending: false)).called(1);

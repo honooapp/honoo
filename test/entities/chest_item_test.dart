@@ -3,15 +3,29 @@ import 'package:honoo/Entities/chest_item.dart';
 import 'package:honoo/Entities/hinoo.dart';
 
 void main() {
+  test(
+    'riconosce risposte legacy senza reply_to ma conserva le copie Luna',
+    () {
+      final row = <String, dynamic>{
+        'id': 'legacy',
+        'pages': <Map<String, dynamic>>[],
+        'type': 'personal',
+        'recipient_tag': 'recipient',
+        'conversation_id': 'thread',
+      };
+      expect(ChestHinooItem.fromDatabaseRow(row)!.draft.type, HinooType.answer);
+      row['is_from_moon_saved'] = true;
+      expect(
+        ChestHinooItem.fromDatabaseRow(row)!.draft.type,
+        HinooType.personal,
+      );
+    },
+  );
   test('reply_to classifica come answer anche un vecchio record personal', () {
     final item = ChestHinooItem.fromDatabaseRow({
       'id': 'reply-id',
       'pages': <Map<String, dynamic>>[
-        {
-          'backgroundImage': null,
-          'text': 'Risposta',
-          'isTextWhite': true,
-        },
+        {'backgroundImage': null, 'text': 'Risposta', 'isTextWhite': true},
       ],
       'type': 'personal',
       'reply_to': 'parent-id',

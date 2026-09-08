@@ -98,7 +98,11 @@ class _ReplyHonooPageState extends State<ReplyHonooPage> {
     final defaultLink = ConversationLink.fromParent(
       parentId: replyTarget,
       parentConversationId: widget.originalHonoo.conversationId,
-      recipientId: widget.originalHonoo.userId,
+      recipientId: ConversationLink.recipientForParent(
+        ownerId: widget.originalHonoo.userId,
+        parentRecipientId: widget.originalHonoo.recipientTag,
+        currentUserId: currentUser.id,
+      ),
     );
     final conversationId = await chooseReplyConversation(
       context: context,

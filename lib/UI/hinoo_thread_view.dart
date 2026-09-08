@@ -14,9 +14,13 @@ class HinooThreadView extends StatefulWidget {
     required this.maxHeight,
     required this.maxWidth,
     this.rootAuthorId,
+    this.rootId,
+    this.onSelect,
     this.onDownloadTap,
   });
 
+  final String? rootId;
+  final ValueChanged<HinooThreadEntry>? onSelect;
   final HinooDraft root;
   final List<HinooThreadEntry> replies;
   final double maxHeight;
@@ -29,7 +33,7 @@ class HinooThreadView extends StatefulWidget {
 }
 
 class _HinooThreadViewState extends State<HinooThreadView>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _introController;
   late final Animation<double> _introCurve;
   late final AnimationController _bounceController;
@@ -38,6 +42,7 @@ class _HinooThreadViewState extends State<HinooThreadView>
   late final AnimationController _hintController;
   late final Animation<double> _hintCurve;
   bool _hinted = false;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -93,10 +98,16 @@ class _HinooThreadViewState extends State<HinooThreadView>
       ...sortedReplies,
       HinooThreadEntry(
         draft: widget.root,
+        id: widget.rootId,
         authorId: widget.rootAuthorId,
         isReply: false,
       ),
     ];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        widget.onSelect?.call(items[_selectedIndex.clamp(0, items.length - 1)]);
+      }
+    });
     final slider = LayoutBuilder(
       builder: (ctx, c) {
         final double h = c.maxHeight.isFinite ? c.maxHeight : widget.maxHeight;
@@ -124,6 +135,10 @@ class _HinooThreadViewState extends State<HinooThreadView>
               pageSnapping: true,
               physics: const PageScrollPhysics(parent: ClampingScrollPhysics()),
               itemCount: items.length,
+              onPageChanged: (index) {
+                _selectedIndex = index;
+                widget.onSelect?.call(items[index]);
+              },
               itemBuilder: (context, index) {
                 final entry = items[index];
                 final style = ChestContentStyle.forHinoo(

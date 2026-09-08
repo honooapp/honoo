@@ -454,6 +454,7 @@ class ChestController extends ValueNotifier<ChestState> {
           type: HinooType.answer,
           recipientTag: row['recipient_tag'] as String?,
           replyTo: rootId.isEmpty ? null : rootId,
+          conversationId: conversationId.isEmpty ? null : conversationId,
         );
         if (rootId.isNotEmpty) {
           hinooReplies
@@ -461,6 +462,7 @@ class ChestController extends ValueNotifier<ChestState> {
               .add(
                 HinooThreadEntry(
                   draft: draft,
+                  id: row['id']?.toString(),
                   authorId: row['user_id']?.toString(),
                   isReply: true,
                   createdAt: created,

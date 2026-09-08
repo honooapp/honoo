@@ -3,6 +3,26 @@ import 'package:honoo/Entities/conversation_link.dart';
 
 void main() {
   group('ConversationLink', () {
+    test('continuare un messaggio inviato mantiene il destinatario', () {
+      expect(
+        ConversationLink.recipientForParent(
+          ownerId: 'me',
+          parentRecipientId: 'other',
+          currentUserId: 'me',
+        ),
+        'other',
+      );
+    });
+    test('rispondere a un messaggio ricevuto indirizza al suo autore', () {
+      expect(
+        ConversationLink.recipientForParent(
+          ownerId: 'other',
+          parentRecipientId: 'me',
+          currentUserId: 'me',
+        ),
+        'other',
+      );
+    });
     for (final crossing in const [
       'honoo → honoo',
       'honoo → hinoo',

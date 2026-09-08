@@ -3,6 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:honoo/Entities/chest_item.dart';
 import 'package:honoo/Entities/conversation_entry.dart';
 import 'package:honoo/Entities/honoo.dart';
+import 'package:honoo/Entities/hinoo.dart';
+import 'package:honoo/Entities/hinoo_thread_entry.dart';
+import 'package:honoo/UI/hinoo_thread_view.dart';
 import 'package:honoo/UI/honoo_card.dart';
 import 'package:honoo/UI/honoo_thread_view.dart';
 import 'package:honoo/UI/unified_thread_view.dart';
@@ -23,6 +26,49 @@ void main() {
   });
 
   tearDown(() => harness.disableOverrides());
+
+  testWidgets('thread Hinoo legacy comunica gli id visibili al menu', (
+    tester,
+  ) async {
+    const draft = HinooDraft(
+      pages: [
+        HinooSlide(backgroundImage: null, text: 'Test', isTextWhite: true),
+      ],
+    );
+    HinooThreadEntry? selected;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            height: 600,
+            width: 400,
+            child: HinooThreadView(
+              root: draft,
+              rootId: 'root',
+              rootAuthorId: 'me',
+              replies: const [
+                HinooThreadEntry(
+                  id: 'reply',
+                  draft: draft,
+                  authorId: 'other',
+                  isReply: true,
+                ),
+              ],
+              maxHeight: 600,
+              maxWidth: 400,
+              onSelect: (entry) => selected = entry,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(selected?.id, 'reply');
+    await tester.drag(find.byType(PageView).first, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    expect(selected?.id, 'root');
+  });
 
   testWidgets(
     'il contenitore non mantiene il rosso della radice su una risposta propria',

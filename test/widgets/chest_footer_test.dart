@@ -106,6 +106,36 @@ void main() {
     );
   }
 
+  testWidgets('risposta senza selezione mantiene Rispondi', (tester) async {
+    final item = honooItem(HonooType.answer);
+    item.honoo!.dbId = 'legacy-answer';
+    ConversationEntry? target;
+    await pumpFooter(
+      tester,
+      item: item,
+      onReplyToConversationEntry: (entry) => target = entry,
+    );
+    await tester.tap(find.byTooltip('Rispondi'));
+    expect(target?.id, 'legacy-answer');
+  });
+
+  testWidgets('Rispondi usa il messaggio visibile e non la radice Luna', (
+    tester,
+  ) async {
+    final root = honooItem(HonooType.personal, isFromMoonSaved: true);
+    root.honoo!.dbId = 'moon-root';
+    final reply = honooItem(HonooType.answer).honoo!..dbId = 'visible-reply';
+    ConversationEntry? target;
+    await pumpFooter(
+      tester,
+      item: root,
+      selectedConversationEntry: ConversationEntry.honoo(reply),
+      onReplyToConversationEntry: (entry) => target = entry,
+    );
+    await tester.tap(find.byTooltip('Rispondi'));
+    expect(target?.id, 'visible-reply');
+  });
+
   testWidgets(
     'le azioni restano ferme durante caricamento e cambio selezione',
     (tester) async {
@@ -300,6 +330,7 @@ void main() {
         conversationId: 'conversation-1',
       );
       item.honoo!.dbId = 'root-1';
+      item.honoo!.dbId ??= 'saved-root';
       final selectedEntry = ConversationEntry.honoo(item.honoo!);
       Honoo? publishedHonoo;
 
@@ -434,6 +465,7 @@ void main() {
         isFromMoonSaved: true,
         conversationId: 'conversation-1',
       );
+      item.honoo!.dbId ??= 'saved-root';
       final selectedEntry = ConversationEntry.honoo(item.honoo!);
 
       await pumpFooter(

@@ -73,9 +73,11 @@ class ChestFooter extends StatelessWidget {
       hinoo: (hinoo) => _addHinooActions(actions, hinoo),
     );
 
-    final selectedEntry = selectedConversationEntry;
-    if (_canReplyTo(selectedEntry) &&
-        !actions.any((action) => action.tooltip == 'Rispondi')) {
+    final selectedEntry = selectedConversationEntry ?? _standaloneReplyEntry;
+    if (selectedEntry != null) {
+      actions.removeWhere((action) => action.tooltip == 'Rispondi');
+    }
+    if (_canReplyTo(selectedEntry)) {
       actions.add(
         _replyAction(() => onReplyToConversationEntry(selectedEntry!)),
       );
@@ -165,6 +167,20 @@ class ChestFooter extends StatelessWidget {
 
   bool _isMine(String? ownerId) =>
       ownerId != null && currentUserId != null && ownerId == currentUserId;
+
+  ConversationEntry? get _standaloneReplyEntry => item?.when(
+    honoo: (h) =>
+        h.type == HonooType.answer ? ConversationEntry.honoo(h) : null,
+    hinoo: (h) => h.draft.type == HinooType.answer
+        ? ConversationEntry.hinoo(
+            h.draft,
+            createdAt: h.createdAt,
+            ownerId: h.ownerId,
+            id: h.id,
+            isFromMoonSaved: h.isFromMoonSaved,
+          )
+        : null,
+  );
 
   bool _canReplyTo(ConversationEntry? entry) =>
       entry != null &&

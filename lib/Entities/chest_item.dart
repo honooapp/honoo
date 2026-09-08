@@ -50,14 +50,18 @@ class ChestHinooItem {
     final typeValue = row['type']?.toString();
     final replyTo = row['reply_to']?.toString();
     final hasReplyTarget = replyTo != null && replyTo.isNotEmpty;
-    final type = hasReplyTarget
+    final isFromMoonSaved = (row['is_from_moon_saved'] as bool?) ?? false;
+    final legacyReply =
+        !isFromMoonSaved &&
+        row['recipient_tag']?.toString().isNotEmpty == true &&
+        row['conversation_id']?.toString().isNotEmpty == true;
+    final type = hasReplyTarget || legacyReply
         ? HinooType.answer
         : typeValue == 'moon' || typeValue == 'public'
         ? HinooType.moon
         : typeValue == 'answer'
-            ? HinooType.answer
-            : HinooType.personal;
-    final isFromMoonSaved = (row['is_from_moon_saved'] as bool?) ?? false;
+        ? HinooType.answer
+        : HinooType.personal;
 
     return ChestHinooItem(
       id: id,
@@ -72,7 +76,8 @@ class ChestHinooItem {
         conversationId: row['conversation_id']?.toString(),
         isFromMoonSaved: isFromMoonSaved,
       ),
-      createdAt: DateTime.tryParse((row['created_at'] ?? '').toString()) ??
+      createdAt:
+          DateTime.tryParse((row['created_at'] ?? '').toString()) ??
           DateTime.fromMillisecondsSinceEpoch(0),
       isFromMoonSaved: isFromMoonSaved,
       isOnMoon: (row['is_on_moon'] as bool?) ?? false,
