@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:mocktail/mocktail.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -67,6 +69,65 @@ void main() {
     await events.close();
     harness.disableOverrides();
   });
+
+  for (final queued in [true, false]) {
+    testWidgets('logout clears notifications, queued=$queued', (tester) async {
+      final authEvents = StreamController<AuthState>();
+      addTearDown(authEvents.close);
+      when(
+        () => harness.auth.onAuthStateChange,
+      ).thenAnswer((_) => authEvents.stream);
+      final navigatorKey = GlobalKey<NavigatorState>();
+      final notification = _FakeReplySystemNotification();
+      await tester.pumpWidget(
+        GlobalReplyNotificationListener(
+          navigatorKey: navigatorKey,
+          systemNotification: notification,
+          replyEventStream: events.stream,
+          child: MaterialApp(
+            navigatorKey: navigatorKey,
+            home: const Scaffold(body: Text('Home')),
+          ),
+        ),
+      );
+      events.add(
+        ReplyNotificationEvent(
+          kind: ReplyNotificationKind.honoo,
+          conversationId: 'old-conversation',
+          senderId: 'other',
+          recipientId: 'test_user',
+          replyId: 'old-reply',
+          createdAt: DateTime.utc(2026, 9, 9),
+        ),
+      );
+      await tester.pump(
+        queued ? Duration.zero : const Duration(milliseconds: 200),
+      );
+      final oldTap = notification.onTap;
+      authEvents.add(AuthState(AuthChangeEvent.signedOut, null));
+      await tester.pumpAndSettle();
+      expect(find.text('Hai ricevuto una nuova risposta'), findsNothing);
+      expect(notification.showCount, queued ? 0 : 1);
+      if (!queued) {
+        expect(notification.closedConversations, contains('old-conversation'));
+        oldTap!();
+        await tester.pumpAndSettle();
+        expect(find.byType(ChestPage), findsNothing);
+      }
+      // A late event from the old subscription must also be discarded.
+      events.add(
+        const ReplyNotificationEvent(
+          kind: ReplyNotificationKind.honoo,
+          conversationId: 'old-conversation',
+          senderId: 'other',
+          recipientId: 'test_user',
+          replyId: 'late-reply',
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(notification.showCount, queued ? 0 : 1);
+    });
+  }
 
   testWidgets(
     'la notifica apre lo Scrigno sulla conversazione della risposta',

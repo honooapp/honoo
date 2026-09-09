@@ -366,6 +366,84 @@ void main() {
     expect(tester.widget<PageView>(find.byType(PageView)).controller!.page, 2);
   });
 
+  testWidgets(
+    'da notifica: una nuova risposta non sposta la pagina scelta con lo swipe',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(600, 900);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final root = ConversationEntry.honoo(
+        honoo(
+          id: 'root-scroll',
+          text: 'Contenuto a cui si è risposto',
+          owner: 'me',
+          createdAt: '2026-07-20T10:00:00Z',
+        ),
+      );
+      final reply = ConversationEntry.honoo(
+        honoo(
+          id: 'reply-scroll',
+          text: 'Risposta inizialmente visibile',
+          owner: 'other',
+          createdAt: '2026-07-20T11:00:00Z',
+          type: HonooType.answer,
+          replyTo: 'root-scroll',
+        ),
+      );
+      final newReply = ConversationEntry.honoo(
+        honoo(
+          id: 'reply-scroll-new',
+          text: 'Nuova risposta realtime',
+          owner: 'other',
+          createdAt: '2026-07-20T12:00:00Z',
+          type: HonooType.answer,
+          replyTo: 'reply-scroll',
+        ),
+      );
+      var entries = [root, reply];
+      String? selectedId;
+
+      Widget app(int refreshToken) => MaterialApp(
+        home: Scaffold(
+          body: UnifiedThreadView(
+            key: const Key('scroll-refresh-thread'),
+            revealEntryId: 'reply-scroll',
+            conversationId: 'conversation-1',
+            maxWidth: 600,
+            maxHeight: 700,
+            isActive: true,
+            currentUserId: 'me',
+            refreshToken: refreshToken,
+            conversationLoader: (_) async => entries,
+            onSelect: (entry) => selectedId = entry.id,
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(app(0));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1000));
+      expect(selectedId, 'reply-scroll');
+
+      await tester.drag(find.byType(PageView), const Offset(0, -650));
+      await tester.pumpAndSettle();
+      expect(selectedId, 'root-scroll');
+
+      entries = [root, reply, newReply];
+      await tester.pumpWidget(app(1));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(selectedId, 'root-scroll');
+      expect(
+        tester.widget<PageView>(find.byType(PageView)).controller!.page,
+        2,
+      );
+    },
+  );
+
   testWidgets('un errore di conversazione mostra Riprova', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

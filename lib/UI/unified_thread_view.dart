@@ -245,10 +245,13 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
         _loading = false;
         _loadError = null;
       });
+      final focusWasApplied = _appliedFocusKey;
       _prefetchEntriesFrom(_pageToShowFirst);
       _showLatestReceivedAndReveal(forceFocus: wasEmpty);
       if (widget.isActive && _entries.isNotEmpty) {
-        final hasExplicitReveal = (widget.revealEntryId ?? '').isNotEmpty;
+        final hasExplicitReveal =
+            (widget.revealEntryId ?? '').isNotEmpty &&
+            focusWasApplied != _appliedFocusKey;
         final reversed = _entries.reversed.toList(growable: false);
         var selectedPage = (wasEmpty || hasExplicitReveal)
             ? _pageToShowFirst

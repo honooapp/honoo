@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../Entities/reply_notification_event.dart';
 import '../Pages/chest_page.dart';
 import '../Services/reply_system_notification.dart';
+import '../Services/reply_catch_up_service.dart';
 import '../Services/supabase_provider.dart';
 import '../Utility/reply_notification_signal.dart';
 import '../Utility/replies_seen_tracker.dart';
@@ -61,6 +62,8 @@ class _GlobalReplyNotificationListenerState
   final Map<String, ReplyNotificationEvent> _shownEventsByConversation =
       <String, ReplyNotificationEvent>{};
   bool _multipleNotificationShown = false;
+  int _notificationGeneration = 0;
+  final Set<DialogRoute<bool>> _notificationDialogs = {};
 
   @override
   void initState() {
@@ -87,22 +90,23 @@ class _GlobalReplyNotificationListenerState
   }
 
   void _start() {
-    final testEvents = widget.replyEventStream;
-    if (testEvents != null) {
-      _replyEventSubscription ??= testEvents.listen(_handleEvent);
-      return;
-    }
     _authSubscription ??= SupabaseProvider.client.auth.onAuthStateChange.listen(
       (state) {
         _handleSession(state.session);
       },
     );
     _handleSession(SupabaseProvider.client.auth.currentSession);
+    final testEvents = widget.replyEventStream;
+    if (testEvents != null) {
+      _replyEventSubscription ??= testEvents.listen(_handleEvent);
+    }
   }
 
   void _handleSession(Session? session) {
     final userId = session?.user.id;
-    final accessToken = session?.accessToken;
+    final accessToken = widget.replyEventStream == null
+        ? session?.accessToken
+        : null;
     if (accessToken != null) {
       SupabaseProvider.client.realtime.setAuth(accessToken);
     }
@@ -114,7 +118,7 @@ class _GlobalReplyNotificationListenerState
       return;
     }
     _closeRealtime(clearUser: false);
-    _deliveredEventKeys.clear();
+    _resetNotifications();
     _lastCatchUpAt = null;
     _activeUserId = userId;
     if (userId == null) return;
@@ -123,6 +127,7 @@ class _GlobalReplyNotificationListenerState
   }
 
   void _startCatchUpTimer(String userId) {
+    if (widget.replyEventStream != null) return;
     _catchUpTimer ??= Timer.periodic(widget.catchUpInterval, (_) {
       if (_activeUserId == userId && _replyChannel != null) {
         unawaited(_catchUpMissedReplies(userId, _channelGeneration));
@@ -131,6 +136,7 @@ class _GlobalReplyNotificationListenerState
   }
 
   void _connectChannels(String userId) {
+    if (widget.replyEventStream != null) return;
     _reconnectTimer?.cancel();
     final generation = ++_channelGeneration;
     try {
@@ -144,8 +150,12 @@ class _GlobalReplyNotificationListenerState
                 table: 'honoo',
                 filter: 'recipient_tag=eq.$userId',
               ),
-              (dynamic payload, [dynamic _]) =>
-                  _handlePayload(payload, ReplyNotificationKind.honoo, userId),
+              (dynamic payload, [dynamic _]) => _handlePayload(
+                payload,
+                ReplyNotificationKind.honoo,
+                userId,
+                generation,
+              ),
             )
             ..on(
               RealtimeListenTypes.postgresChanges,
@@ -155,8 +165,12 @@ class _GlobalReplyNotificationListenerState
                 table: 'hinoo',
                 filter: 'recipient_tag=eq.$userId',
               ),
-              (dynamic payload, [dynamic _]) =>
-                  _handlePayload(payload, ReplyNotificationKind.hinoo, userId),
+              (dynamic payload, [dynamic _]) => _handlePayload(
+                payload,
+                ReplyNotificationKind.hinoo,
+                userId,
+                generation,
+              ),
             );
       _replyChannel = channel;
       channel.subscribe((status, [error]) {
@@ -197,7 +211,13 @@ class _GlobalReplyNotificationListenerState
     dynamic payload,
     ReplyNotificationKind kind,
     String userId,
+    int generation,
   ) {
+    if (!mounted ||
+        userId != _activeUserId ||
+        generation != _channelGeneration) {
+      return;
+    }
     final event = ReplyNotificationEvent.fromRealtimePayload(
       payload,
       kind: kind,
@@ -209,6 +229,9 @@ class _GlobalReplyNotificationListenerState
   }
 
   void _handleEvent(ReplyNotificationEvent event) {
+    if (!mounted || !widget.enabled || event.recipientId != _activeUserId) {
+      return;
+    }
     final eventKey =
         '${event.recipientId}:${event.kind.name}:${event.replyId ?? event.conversationId}';
     if (!_deliveredEventKeys.add(eventKey)) return;
@@ -225,19 +248,28 @@ class _GlobalReplyNotificationListenerState
   Future<void> _flushPendingEvents() async {
     _notificationTimer = null;
     if (!mounted || _pendingEvents.isEmpty) return;
+    final generation = _notificationGeneration;
     final queuedEvents = _pendingEvents.values.toList(growable: false);
     _pendingEvents.clear();
     final events = await _onlyUnseenEvents(queuedEvents);
-    if (!mounted || events.isEmpty) return;
+    if (!mounted || generation != _notificationGeneration || events.isEmpty) {
+      return;
+    }
     final event = events.last;
     final replyCount = events.length;
     final conversationIds = events.map((item) => item.conversationId).toSet();
     final hasMultipleConversations = conversationIds.length > 1;
     ReplyNotificationSignal.notifyChanged();
 
-    void open() => hasMultipleConversations
-        ? _openRepliesInbox()
-        : _openConversation(event);
+    void open() {
+      if (!mounted || generation != _notificationGeneration) return;
+      if (hasMultipleConversations) {
+        _openRepliesInbox();
+      } else {
+        _openConversation(event);
+      }
+    }
+
     _systemNotification.show(
       contentLabel: event.contentLabel,
       conversationId: hasMultipleConversations
@@ -288,12 +320,13 @@ class _GlobalReplyNotificationListenerState
 
   Future<void> _closeNotificationsAlreadySeen() async {
     if (_shownEventsByConversation.isEmpty && _pendingEvents.isEmpty) return;
+    final generation = _notificationGeneration;
     final events = <ReplyNotificationEvent>{
       ..._shownEventsByConversation.values,
       ..._pendingEvents.values,
     }.toList(growable: false);
     final unseen = await _onlyUnseenEvents(events);
-    if (!mounted) return;
+    if (!mounted || generation != _notificationGeneration) return;
     final unseenConversations = unseen.map((e) => e.conversationId).toSet();
     final shownConversations = _shownEventsByConversation.keys.toList();
     for (final conversationId in shownConversations) {
@@ -315,9 +348,8 @@ class _GlobalReplyNotificationListenerState
     required int replyCount,
     required VoidCallback onOpen,
   }) async {
-    final shouldOpen = await showDialog<bool>(
+    final route = DialogRoute<bool>(
       context: context,
-      useRootNavigator: true,
       barrierDismissible: true,
       builder: (_) => HonooConfirmDialog(
         title: replyCount == 1
@@ -327,6 +359,13 @@ class _GlobalReplyNotificationListenerState
         cancelLabel: 'Ignora',
       ),
     );
+    _notificationDialogs.add(route);
+    final bool? shouldOpen;
+    try {
+      shouldOpen = await Navigator.of(context, rootNavigator: true).push(route);
+    } finally {
+      _notificationDialogs.remove(route);
+    }
     if (!mounted || shouldOpen != true) return;
     onOpen();
   }
@@ -346,27 +385,19 @@ class _GlobalReplyNotificationListenerState
           ? lastCatchUp
           : baseline;
       final since = sinceDate?.toIso8601String();
-      dynamic honooQuery = SupabaseProvider.client
-          .from('honoo')
-          .select(
-            'id,destination,reply_to,recipient_tag,created_at,user_id,conversation_id',
-          )
-          .eq('destination', 'reply')
-          .eq('recipient_tag', userId);
-      dynamic hinooQuery = SupabaseProvider.client
-          .from('hinoo')
-          .select(
-            'id,type,reply_to,recipient_tag,created_at,user_id,conversation_id',
-          )
-          .eq('type', 'answer')
-          .eq('recipient_tag', userId);
-      if (since != null) {
-        honooQuery = honooQuery.gt('created_at', since);
-        hinooQuery = hinooQuery.gt('created_at', since);
-      }
-      final results = await Future.wait<dynamic>([
-        honooQuery.order('created_at', ascending: false).limit(100),
-        hinooQuery.order('created_at', ascending: false).limit(100),
+      final results = await Future.wait<List<Map<String, dynamic>>>([
+        ReplyCatchUpService.fetchReplies(
+          userId: userId,
+          kind: ReplyNotificationKind.honoo,
+          since: since,
+          until: catchUpStartedAt,
+        ),
+        ReplyCatchUpService.fetchReplies(
+          userId: userId,
+          kind: ReplyNotificationKind.hinoo,
+          since: since,
+          until: catchUpStartedAt,
+        ),
       ]);
       if (!mounted || generation != _channelGeneration) return;
       final pending = <ReplyNotificationEvent>[];
@@ -458,12 +489,28 @@ class _GlobalReplyNotificationListenerState
     _startCatchUpTimer(userId);
   }
 
-  void _stop() {
+  void _resetNotifications() {
+    _notificationGeneration++;
+    _deliveredEventKeys.clear();
+    for (final conversationId in _shownEventsByConversation.keys) {
+      _systemNotification.closeConversation(conversationId);
+    }
+    if (_multipleNotificationShown) {
+      _systemNotification.closeConversation('multiple-conversations');
+    }
+    for (final route in _notificationDialogs.toList()) {
+      if (route.isActive) route.navigator?.removeRoute(route);
+    }
+    _notificationDialogs.clear();
     _notificationTimer?.cancel();
     _notificationTimer = null;
     _pendingEvents.clear();
     _shownEventsByConversation.clear();
     _multipleNotificationShown = false;
+  }
+
+  void _stop() {
+    _resetNotifications();
     _replyEventSubscription?.cancel();
     _replyEventSubscription = null;
     _authSubscription?.cancel();
