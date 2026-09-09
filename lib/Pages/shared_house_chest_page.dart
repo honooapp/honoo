@@ -69,9 +69,27 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
       body: SafeArea(
         child: Column(
           children: [
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: HonooAppTitle(),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: Center(child: HonooAppTitle()),
+                  ),
+                  PositionedDirectional(
+                    start: 8,
+                    child: IconButton(
+                      tooltip: 'Indietro',
+                      color: Colors.white,
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    ),
+                  ),
+                ],
+              ),
             ),
             Expanded(child: _body()),
             if (!_loading && _error == null && _items.isNotEmpty)
