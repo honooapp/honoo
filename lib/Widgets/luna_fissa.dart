@@ -125,7 +125,7 @@ class _LunaFissaState extends State<LunaFissa> with WidgetsBindingObserver {
       _invitesChannel!
           .on(
             RealtimeListenTypes.postgresChanges,
-            ChannelFilter(event: '*', schema: 'public', table: 'house_invites'),
+            ChannelFilter(event: '*', schema: 'public', table: 'admin_stats_signal'),
             (_, [__]) => _loadPendingRequestsCount(),
           )
           .subscribe();

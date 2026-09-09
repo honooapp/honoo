@@ -20,16 +20,20 @@ class AdminMenuPage extends StatefulWidget {
   State<AdminMenuPage> createState() => _AdminMenuPageState();
 }
 
-class _AdminMenuPageState extends State<AdminMenuPage> {
+class _AdminMenuPageState extends State<AdminMenuPage>
+    with WidgetsBindingObserver {
   final TextEditingController _emailController = TextEditingController();
   final AdminService _adminService = AdminService();
   late final Future<bool> _adminCheck;
   bool _invitingAll = false;
   bool _invitingEmail = false;
   bool _loadingEmails = false;
-  bool _loadingVisits = false;
-  bool _loadingMoonCounts = false;
-  bool _loadingDailyCounts = false;
+  bool _loadingStats = false;
+  bool _statsRefreshPending = false;
+  Map<String, dynamic>? _snapshot;
+  String? _statsError;
+  Timer? _statsDebounce;
+
   List<String> _emailHints = const [];
   Map<DateTime, int> _visits = const {};
   Map<String, int> _moonCounts = const {'honoo': 0, 'hinoo': 0};
@@ -50,30 +54,26 @@ class _AdminMenuPageState extends State<AdminMenuPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _adminCheck = _adminService.isCurrentUserAdmin();
     _adminCheck.then((isAdmin) {
-      if (isAdmin) {
+      if (mounted && isAdmin) {
         _loadEmailHints();
-        _loadVisits();
-        _loadMoonCounts();
-        _loadDailyCounts();
+        _loadStatistics();
         _loadPendingInvites();
         _subscribeStats();
-        _statsRefreshTimer = Timer.periodic(
-          const Duration(seconds: 15),
-          (_) {
-            _loadVisits();
-            _loadMoonCounts();
-            _loadDailyCounts();
-            _loadPendingInvites();
-          },
-        );
+        _statsRefreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+          _loadStatistics();
+          _loadPendingInvites();
+        });
       }
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _statsDebounce?.cancel();
     _statsRefreshTimer?.cancel();
     _statsChannel?.unsubscribe();
     _emailController.dispose();
@@ -83,36 +83,83 @@ class _AdminMenuPageState extends State<AdminMenuPage> {
   void _subscribeStats() {
     if (_statsChannel != null) return;
     _statsChannel = SupabaseProvider.client.channel('admin-stats');
-    void refresh(dynamic _, [dynamic __]) {
-      _loadVisits();
-      _loadMoonCounts();
-      _loadDailyCounts();
-    }
-
-    void refreshInv(dynamic _, [dynamic __]) => _loadPendingInvites();
-
     _statsChannel!
         .on(
           RealtimeListenTypes.postgresChanges,
-          ChannelFilter(event: '*', schema: 'public', table: 'honoo'),
-          refresh,
+          ChannelFilter(
+            event: '*',
+            schema: 'public',
+            table: 'admin_stats_signal',
+          ),
+          (dynamic _, [dynamic __]) {
+            if (!mounted || _statsDebounce?.isActive == true) return;
+            _statsDebounce = Timer(const Duration(milliseconds: 300), () {
+              if (!mounted) return;
+              _loadStatistics();
+              _loadPendingInvites();
+            });
+          },
         )
-        .on(
-          RealtimeListenTypes.postgresChanges,
-          ChannelFilter(event: '*', schema: 'public', table: 'hinoo'),
-          refresh,
-        )
-        .on(
-          RealtimeListenTypes.postgresChanges,
-          ChannelFilter(event: '*', schema: 'public', table: 'site_visits'),
-          refresh,
-        )
-        .on(
-          RealtimeListenTypes.postgresChanges,
-          ChannelFilter(event: '*', schema: 'public', table: 'house_invites'),
-          refreshInv,
+        .subscribe((status, [error]) {
+          if (mounted && status == 'SUBSCRIBED') {
+            _loadStatistics();
+          }
+        });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _statsChannel != null) {
+      _loadStatistics();
+    }
+  }
+
+  Future<void> _loadStatistics() async {
+    if (!mounted) return;
+    if (_loadingStats) {
+      _statsRefreshPending = true;
+      return;
+    }
+    setState(() => _loadingStats = true);
+    try {
+      final snapshot = await _adminService.fetchStatistics();
+      if (!mounted) return;
+      final counts = Map<String, int>.from(
+        (snapshot['daily'] as Map).map(
+          (key, value) => MapEntry(key, (value as num).toInt()),
+        ),
+      );
+      final visits = <DateTime, int>{};
+      for (final entry in (snapshot['visits'] as Map).entries) {
+        visits[DateTime.parse(entry.key as String)] = (entry.value as num)
+            .toInt();
+      }
+      setState(() {
+        _snapshot = snapshot;
+        _dailyCounts = counts;
+        _moonCounts = {
+          'honoo': counts['moon_honoo'] ?? 0,
+          'hinoo': counts['moon_hinoo'] ?? 0,
+        };
+        _visits = visits;
+        _statsError = null;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _statsError =
+              'Aggiornamento non riuscito. I dati precedenti potrebbero non essere attuali.',
         );
-    _statsChannel!.subscribe();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loadingStats = false);
+        if (_statsRefreshPending) {
+          _statsRefreshPending = false;
+          unawaited(_loadStatistics());
+        }
+      }
+    }
   }
 
   Future<void> _loadPendingInvites() async {
@@ -160,42 +207,6 @@ class _AdminMenuPageState extends State<AdminMenuPage> {
       setState(() => _emailHints = emails);
     } finally {
       if (mounted) setState(() => _loadingEmails = false);
-    }
-  }
-
-  Future<void> _loadVisits() async {
-    if (_loadingVisits) return;
-    setState(() => _loadingVisits = true);
-    try {
-      final visits = await _adminService.fetchRecentVisits();
-      if (!mounted) return;
-      setState(() => _visits = visits);
-    } finally {
-      if (mounted) setState(() => _loadingVisits = false);
-    }
-  }
-
-  Future<void> _loadMoonCounts() async {
-    if (_loadingMoonCounts) return;
-    setState(() => _loadingMoonCounts = true);
-    try {
-      final counts = await _adminService.fetchTodayMoonCounts();
-      if (!mounted) return;
-      setState(() => _moonCounts = counts);
-    } finally {
-      if (mounted) setState(() => _loadingMoonCounts = false);
-    }
-  }
-
-  Future<void> _loadDailyCounts() async {
-    if (_loadingDailyCounts) return;
-    setState(() => _loadingDailyCounts = true);
-    try {
-      final counts = await _adminService.fetchDailyContentCounts();
-      if (!mounted) return;
-      setState(() => _dailyCounts = counts);
-    } finally {
-      if (mounted) setState(() => _loadingDailyCounts = false);
     }
   }
 
@@ -258,18 +269,14 @@ class _AdminMenuPageState extends State<AdminMenuPage> {
       final hasCasa = await _adminService.hasCasaForUser(target.authUserId);
       if (hasCasa) {
         if (!mounted) return;
-        showHonooToast(
-          context,
-          message: 'Utente già con casa.',
-        );
+        showHonooToast(context, message: 'Utente già con casa.');
         return;
       }
       final inserted = await _adminService.inviteUsers(
         adminUid: user.id,
         userIds: [target.authUserId],
         userEmails: {
-          if ((target.email ?? '').isNotEmpty)
-            target.authUserId: target.email!,
+          if ((target.email ?? '').isNotEmpty) target.authUserId: target.email!,
         },
       );
       if (!mounted) return;
@@ -291,6 +298,12 @@ class _AdminMenuPageState extends State<AdminMenuPage> {
       MaterialPageRoute(builder: (_) => const HomePage()),
       (route) => false,
     );
+  }
+
+  String _formatTimestamp(String value) {
+    final date = DateTime.parse(value).toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(date.day)}/${two(date.month)}/${date.year} ${two(date.hour)}:${two(date.minute)}:${two(date.second)}';
   }
 
   @override
@@ -353,12 +366,20 @@ class _AdminMenuPageState extends State<AdminMenuPage> {
                       ),
                       const SizedBox(height: 8),
                       ..._pendingInvites.map((row) {
-                        final String inviteId = (row['id']?.toString() ?? '').trim();
-                        final String email = (row['email']?.toString() ?? '').trim();
-                        final String userId = (row['user_id']?.toString() ?? '').trim();
-                        final String label = email.isNotEmpty ? email : (userId.isNotEmpty ? userId : 'Richiesta');
-                        final String when = (row['created_at']?.toString() ?? '');
-                        final bool reviewing = _reviewingInviteIds.contains(inviteId);
+                        final String inviteId = (row['id']?.toString() ?? '')
+                            .trim();
+                        final String email = (row['email']?.toString() ?? '')
+                            .trim();
+                        final String userId = (row['user_id']?.toString() ?? '')
+                            .trim();
+                        final String label = email.isNotEmpty
+                            ? email
+                            : (userId.isNotEmpty ? userId : 'Richiesta');
+                        final String when =
+                            (row['created_at']?.toString() ?? '');
+                        final bool reviewing = _reviewingInviteIds.contains(
+                          inviteId,
+                        );
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           child: Container(
@@ -373,7 +394,9 @@ class _AdminMenuPageState extends State<AdminMenuPage> {
                                 Text(
                                   '$label — $when',
                                   style: GoogleFonts.lora(
-                                    color: HonooColor.onBackground.withValues(alpha: 0.9),
+                                    color: HonooColor.onBackground.withValues(
+                                      alpha: 0.9,
+                                    ),
                                     fontSize: 14,
                                   ),
                                 ),
@@ -384,14 +407,20 @@ class _AdminMenuPageState extends State<AdminMenuPage> {
                                     TextButton(
                                       onPressed: reviewing
                                           ? null
-                                          : () => _reviewHouseRequest(inviteId, false),
+                                          : () => _reviewHouseRequest(
+                                              inviteId,
+                                              false,
+                                            ),
                                       child: const Text('Rifiuta'),
                                     ),
                                     const SizedBox(width: 8),
                                     ElevatedButton(
                                       onPressed: reviewing
                                           ? null
-                                          : () => _reviewHouseRequest(inviteId, true),
+                                          : () => _reviewHouseRequest(
+                                              inviteId,
+                                              true,
+                                            ),
                                       child: reviewing
                                           ? const LoadingSpinner(
                                               size: 18,
@@ -492,58 +521,63 @@ class _AdminMenuPageState extends State<AdminMenuPage> {
                         }
                         final query = value.text.toLowerCase();
                         return _emailHints.where(
-                            (email) => email.toLowerCase().contains(query));
+                          (email) => email.toLowerCase().contains(query),
+                        );
                       },
                       onSelected: (selection) {
                         _emailController.text = selection;
                       },
-                      fieldViewBuilder: (
-                        context,
-                        textController,
-                        focusNode,
-                        onFieldSubmitted,
-                      ) {
-                        if (textController.text != _emailController.text) {
-                          textController.text = _emailController.text;
-                          textController.selection =
-                              TextSelection.collapsed(
-                            offset: textController.text.length,
-                          );
-                        }
-                        return TextField(
-                          controller: textController,
-                          focusNode: focusNode,
-                          keyboardType: TextInputType.emailAddress,
-                          textAlign: TextAlign.center,
-                          style:
-                              GoogleFonts.lora(color: Colors.white, fontSize: 16),
-                          cursorColor: Colors.white,
-                          decoration: inputDecoration.copyWith(
-                            suffixIcon: _loadingEmails
-                                ? const Padding(
-                                    padding: EdgeInsets.all(12),
-                                    child: LoadingSpinner(
-                                      size: 16,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : null,
-                          ),
-                          onChanged: (value) {
-                            _emailController.text = value;
+                      fieldViewBuilder:
+                          (
+                            context,
+                            textController,
+                            focusNode,
+                            onFieldSubmitted,
+                          ) {
+                            if (textController.text != _emailController.text) {
+                              textController.text = _emailController.text;
+                              textController.selection =
+                                  TextSelection.collapsed(
+                                    offset: textController.text.length,
+                                  );
+                            }
+                            return TextField(
+                              controller: textController,
+                              focusNode: focusNode,
+                              keyboardType: TextInputType.emailAddress,
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.lora(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
+                              cursorColor: Colors.white,
+                              decoration: inputDecoration.copyWith(
+                                suffixIcon: _loadingEmails
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(12),
+                                        child: LoadingSpinner(
+                                          size: 16,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              onChanged: (value) {
+                                _emailController.text = value;
+                              },
+                            );
                           },
-                        );
-                      },
-                      optionsViewBuilder:
-                          (context, onSelected, options) {
+                      optionsViewBuilder: (context, onSelected, options) {
                         return Align(
                           alignment: Alignment.topCenter,
                           child: Material(
                             color: Colors.black.withValues(alpha: 0.85),
                             borderRadius: BorderRadius.circular(12),
                             child: ConstrainedBox(
-                              constraints:
-                                  const BoxConstraints(maxHeight: 220, maxWidth: 420),
+                              constraints: const BoxConstraints(
+                                maxHeight: 220,
+                                maxWidth: 420,
+                              ),
                               child: ListView.builder(
                                 padding: const EdgeInsets.all(8),
                                 itemCount: options.length,
@@ -589,53 +623,63 @@ class _AdminMenuPageState extends State<AdminMenuPage> {
                             ),
                     ),
                     const SizedBox(height: 32),
-                    Text(
-                      'Visite',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.arvo(
-                        color: HonooColor.onBackground,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                    if (_statsError != null)
+                      Text(
+                        _statsError!,
+                        style: const TextStyle(color: Colors.orange),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    _loadingVisits
-                        ? const Center(
-                            child: LoadingSpinner(color: Colors.white),
-                          )
-                        : _VisitsSummary(visits: _visits),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Luna oggi',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.arvo(
-                        color: HonooColor.onBackground,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                    if (_snapshot == null && _loadingStats)
+                      const Center(child: LoadingSpinner(color: Colors.white)),
+                    if (_snapshot != null) ...[
+                      _RollingCount(
+                        label: 'Utenti attivi (ultimi 2 minuti)',
+                        count: (_snapshot!['active_users'] as num).toInt(),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    _loadingMoonCounts
-                        ? const Center(
-                            child: LoadingSpinner(color: Colors.white),
-                          )
-                        : _MoonCountsSummary(counts: _moonCounts),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Oggi',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.arvo(
-                        color: HonooColor.onBackground,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                      _RollingCount(
+                        label: 'Utenti registrati',
+                        count: (_snapshot!['registered_users'] as num).toInt(),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    _loadingDailyCounts
-                        ? const Center(
-                            child: LoadingSpinner(color: Colors.white),
-                          )
-                        : _DailyCountsSummary(counts: _dailyCounts),
+                      _RollingCount(
+                        label: 'Case',
+                        count: (_snapshot!['houses'] as num).toInt(),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Accessi autenticati alla home',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      Text(
+                        'Rilevati dal ${_formatTimestamp(_snapshot!['tracking_started_at'] as String)}. Amministratori esclusi.',
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                      _VisitsSummary(
+                        visits: _visits,
+                        today: DateTime.parse(_snapshot!['today'] as String),
+                        trackingStartedAt: DateTime.parse(
+                          _snapshot!['tracking_started_date'] as String,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Luna oggi',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      _MoonCountsSummary(counts: _moonCounts),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Creazioni e invii di oggi (Europe/Rome)',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      _DailyCountsSummary(counts: _dailyCounts),
+                      const Text(
+                        'Admin e copie salvate dalla Luna esclusi. Le attività eliminate prima della nuova rilevazione non sono ricostruibili.',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                      Text(
+                        'Ultimo aggiornamento: ${_formatTimestamp(_snapshot!['generated_at'] as String)}',
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -648,26 +692,40 @@ class _AdminMenuPageState extends State<AdminMenuPage> {
 }
 
 class _VisitsSummary extends StatelessWidget {
-  const _VisitsSummary({required this.visits});
+  const _VisitsSummary({
+    required this.visits,
+    required this.today,
+    required this.trackingStartedAt,
+  });
 
   final Map<DateTime, int> visits;
+  final DateTime today;
+  final DateTime trackingStartedAt;
 
   @override
   Widget build(BuildContext context) {
-    final DateTime today = DateTime.now();
     final DateTime day0 = DateTime(today.year, today.month, today.day);
     final DateTime day1 = day0.subtract(const Duration(days: 1));
     final DateTime day2 = day0.subtract(const Duration(days: 2));
 
+    // A pre-tracking day is unknown, not a day with zero visits.
+    Widget row(String label, DateTime day) {
+      if (day.isBefore(trackingStartedAt)) {
+        return Text(
+          '$label: non disponibile',
+          style: const TextStyle(color: Colors.white70),
+        );
+      }
+      return _VisitRow(label: label, count: visits[day] ?? 0);
+    }
+
     final rows = [
-      _VisitRow(label: 'Oggi', count: visits[day0] ?? 0),
-      _VisitRow(label: 'Ieri', count: visits[day1] ?? 0),
-      _VisitRow(label: "L'altro ieri", count: visits[day2] ?? 0),
+      row('Oggi', day0),
+      row('Ieri', day1),
+      row("L'altro ieri", day2),
     ];
 
-    return Column(
-      children: rows,
-    );
+    return Column(children: rows);
   }
 }
 
@@ -724,11 +782,13 @@ class _RollingCount extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            '$label: ',
-            style: GoogleFonts.lora(
-              color: HonooColor.onBackground.withValues(alpha: 0.85),
-              fontSize: 16,
+          Flexible(
+            child: Text(
+              '$label: ',
+              style: GoogleFonts.lora(
+                color: HonooColor.onBackground.withValues(alpha: 0.85),
+                fontSize: 16,
+              ),
             ),
           ),
           _RollingNumber(value: count),
@@ -779,19 +839,19 @@ class _DailyCountsSummary extends StatelessWidget {
     return Column(
       children: [
         _RollingCount(
-          label: 'honoo nello scrigno',
+          label: 'honoo creati nello scrigno',
           count: counts['chest_honoo'] ?? 0,
         ),
         _RollingCount(
-          label: 'hinoo nello scrigno',
+          label: 'hinoo creati nello scrigno',
           count: counts['chest_hinoo'] ?? 0,
         ),
         _RollingCount(
-          label: 'honoo sulla luna',
+          label: 'honoo inviati sulla Luna',
           count: counts['moon_honoo'] ?? 0,
         ),
         _RollingCount(
-          label: 'hinoo sulla luna',
+          label: 'hinoo inviati sulla Luna',
           count: counts['moon_hinoo'] ?? 0,
         ),
         _RollingCount(

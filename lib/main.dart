@@ -1,3 +1,4 @@
+import 'Widgets/activity_tracker.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:honoo/IsolaDelleStorie/Controller/exercise_controller.dart';
@@ -160,7 +161,7 @@ class _MyAppState extends State<MyApp> {
             child: GlobalInviteListener(
               navigatorKey: _navigatorKey,
               enabled: true,
-              child: app,
+              child: ActivityTracker(child: app),
             ),
           ),
         );

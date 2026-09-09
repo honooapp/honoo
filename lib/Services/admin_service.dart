@@ -16,6 +16,24 @@ class AdminService {
 
   final SupabaseClient _client;
 
+  /// Failures propagate: an unavailable statistic must never become a zero.
+  Future<Map<String, dynamic>> fetchStatistics() async {
+    final result = await _client.rpc('admin_statistics_snapshot');
+    if (result is! Map ||
+        result['daily'] is! Map ||
+        result['visits'] is! Map ||
+        result['active_users'] is! num ||
+        result['registered_users'] is! num ||
+        result['houses'] is! num ||
+        result['generated_at'] is! String ||
+        result['tracking_started_at'] is! String ||
+        result['tracking_started_date'] is! String ||
+        result['today'] is! String) {
+      throw const FormatException('Invalid admin statistics snapshot');
+    }
+    return Map<String, dynamic>.from(result);
+  }
+
   Future<bool> isCurrentUserAdmin() async {
     try {
       final res = await _client.rpc('admin_is_admin');
@@ -247,12 +265,9 @@ class AdminService {
   }
 
   Future<int> fetchPendingInviteCount() async {
-    final rows = await _client
-        .from('house_invites')
-        .select('id')
-        .eq('status', 'requested');
-    if (rows is! List) return 0;
-    return rows.length;
+    final count = await _client.rpc('admin_pending_invite_count');
+    if (count is! num) throw const FormatException('Invalid invite count');
+    return count.toInt();
   }
 
   Future<bool> hasCasaForUser(String userId) async {

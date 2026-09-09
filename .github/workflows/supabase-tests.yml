@@ -20,6 +20,11 @@ jobs:
       - name: Verify migration ordering and safety markers
         run: bash tool/check_supabase_migrations.sh
 
+      - name: Test admin statistics on isolated PostgreSQL
+        run: |
+          npm install --prefix "$RUNNER_TEMP/admin-stats-test" @electric-sql/pglite@0.5.8 --no-audit --no-fund
+          PGLITE_MODULE="$RUNNER_TEMP/admin-stats-test/node_modules/@electric-sql/pglite/dist/index.js" node tool/test_admin_statistics.mjs
+
   readonly:
     name: Read-only (analyze + supabase tests)
     runs-on: macos-latest
