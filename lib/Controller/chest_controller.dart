@@ -316,10 +316,11 @@ class ChestController extends ValueNotifier<ChestState> {
           .map(ChestHinooItem.fromDatabaseRow)
           .whereType<ChestHinooItem>()
           .map((item) {
-            final fingerprint = HinooService.fingerprint(
-              item.draft.copyWith(type: HinooType.moon),
-            );
-            if (!moonFingerprints.contains(fingerprint)) return item;
+            if (!HinooService.moonFingerprints(
+              item.draft,
+            ).any(moonFingerprints.contains)) {
+              return item;
+            }
             return ChestHinooItem(
               id: item.id,
               draft: item.draft,

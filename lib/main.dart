@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'env/env.dart';
 import 'Utility/app_logger.dart';
 import 'Utility/app_diagnostics.dart';
+import 'Controller/honoo_controller.dart';
 
 import 'Pages/auth_gate.dart';
 import 'Pages/chest_page.dart';
@@ -81,6 +82,7 @@ class _MyAppState extends State<MyApp> {
       final session = data.session;
       if (!mounted) return;
       if (session == null) {
+        HonooController().clearCache();
         _navigatorKey.currentState?.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const AuthGate()),
           (route) => false,

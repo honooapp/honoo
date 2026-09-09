@@ -12,39 +12,54 @@ class HonooController {
 
   // Cache
   final List<Honoo> _personal = [];
+  String? _cacheUserId;
+  int _loadGeneration = 0;
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(false);
   final ValueNotifier<int> version = ValueNotifier<int>(0);
 
-  String get _uid => SupabaseProvider.client.auth.currentUser!.id;
+  List<Honoo> get personal =>
+      _cacheUserId == null ||
+          _cacheUserId != SupabaseProvider.client.auth.currentUser?.id
+      ? const []
+      : List.unmodifiable(_personal);
 
-  List<Honoo> get personal => List.unmodifiable(_personal);
+  void clearCache() {
+    _loadGeneration++;
+    _cacheUserId = null;
+    _personal.clear();
+    isLoading.value = false;
+    version.value++;
+  }
 
   /// Carica dallo scrigno (destination='chest') – niente mock
   Future<void> loadChest() async {
+    final userId = SupabaseProvider.client.auth.currentUser?.id;
+    if (_cacheUserId != userId) clearCache();
+    if (userId == null) return;
+    _cacheUserId = userId;
+    final generation = ++_loadGeneration;
     isLoading.value = true;
     try {
-      final chest = await HonooService.fetchUserChestHonoo(_uid);
+      final chest = await HonooService.fetchUserChestHonoo(userId);
       List<Honoo> moon = const [];
       try {
-        moon = await HonooService.fetchUserHonoo(_uid, 'moon');
+        moon = await HonooService.fetchUserHonoo(userId, 'moon');
       } catch (error) {
         debugPrint('loadChest moon lookup error: $error');
       }
       final moonContent = moon.map((h) => (h.text, h.image)).toSet();
 
       // Popola cache iniziale
-      _personal
-        ..clear()
-        ..addAll(
-          chest.map(
+      final personal = chest
+          .map(
             (h) =>
                 h.copyWith(isOnMoon: moonContent.contains((h.text, h.image))),
-          ),
-        );
+          )
+          .toList();
 
       // === Calcolo hasReplies con una query IN (...) su reply_to ===
       // prendo tutti gli uuid (dbId) disponibili
-      final ids = _personal.map((h) => h.dbId).whereType<String>().toList();
+      final ids = personal.map((h) => h.dbId).whereType<String>().toList();
       if (ids.isNotEmpty) {
         final client = SupabaseProvider.client;
         final rows = await client
@@ -60,19 +75,25 @@ class HonooController {
         }
 
         // marca i tuoi honoo personali che hanno risposte
-        for (var i = 0; i < _personal.length; i++) {
-          final h = _personal[i];
+        for (var i = 0; i < personal.length; i++) {
+          final h = personal[i];
           final has = h.dbId != null && repliedParents.contains(h.dbId);
           if (has != h.hasReplies) {
-            _personal[i] = h.copyWith(hasReplies: has);
+            personal[i] = h.copyWith(hasReplies: has);
           }
         }
       }
 
-      // NB: isFromMoonSaved resta quello che arriva da DB (o false se non hai colonna)
+      if (generation != _loadGeneration ||
+          SupabaseProvider.client.auth.currentUser?.id != userId) {
+        return;
+      }
+      _personal
+        ..clear()
+        ..addAll(personal);
       version.value++;
     } finally {
-      isLoading.value = false;
+      if (generation == _loadGeneration) isLoading.value = false;
     }
   }
 

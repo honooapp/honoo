@@ -130,6 +130,38 @@ void main() {
     expect(controller.value.hinoo.single.isOnMoon, isTrue);
   });
 
+  for (final legacy in [false, true]) {
+    test('loadHinoo recognizes reply moon copy, legacy=$legacy', () async {
+      final row = {
+        'id': 'reply-1',
+        'pages': [
+          {
+            'backgroundImage': 'bg.png',
+            'text': 'Risposta',
+            'isTextWhite': true,
+          },
+        ],
+        'type': 'answer',
+        'recipient_tag': 'user-2',
+        'reply_to': 'root-1',
+        'conversation_id': 'conversation-1',
+        'user_id': 'user-1',
+      };
+      final draft = ChestHinooItem.fromDatabaseRow(row)!.draft;
+      final moon = legacy
+          ? draft.copyWith(type: HinooType.moon)
+          : HinooDraft(pages: draft.pages, type: HinooType.moon);
+      when(
+        () => repository.fetchHinooRows('user-1'),
+      ).thenAnswer((_) async => [row]);
+      when(
+        () => repository.fetchHinooMoonFingerprints('user-1'),
+      ).thenAnswer((_) async => {HinooService.fingerprint(moon)});
+      await controller.loadHinoo('user-1');
+      expect(controller.value.hinoo.single.isOnMoon, isTrue);
+    });
+  }
+
   test('loadReplies deduplica e conserva la risposta più recente', () async {
     when(() => repository.fetchHonooReplyRows('user-1')).thenAnswer(
       (_) async => [

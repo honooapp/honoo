@@ -216,20 +216,24 @@ class HinooService {
     return parts.join('||');
   }
 
-  static Future<bool> hasMoonCopy(HinooDraft draft) async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) throw 'Utente non autenticato';
+  static Set<String> moonFingerprints(HinooDraft draft) {
     final sanitized = HinooDraft(
       pages: draft.pages,
       type: HinooType.moon,
       baseCanvasHeight: draft.baseCanvasHeight,
     );
-    final fingerprints = <String>{
+    return <String>{
       fingerprint(sanitized),
       // Compatibilità con le copie create prima che i riferimenti privati
       // della conversazione venissero rimossi dalla pubblicazione Luna.
       fingerprint(draft.copyWith(type: HinooType.moon)),
-    }.toList(growable: false);
+    };
+  }
+
+  static Future<bool> hasMoonCopy(HinooDraft draft) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw 'Utente non autenticato';
+    final fingerprints = moonFingerprints(draft).toList(growable: false);
     final row = await _reliability.read(
       () async => await _client
           .from(_table)

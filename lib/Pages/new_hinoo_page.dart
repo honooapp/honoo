@@ -74,6 +74,7 @@ class _NewHinooPageState extends State<NewHinooPage>
   final _controller = HinooController();
   bool _savedToChest = false;
   String? _savedHinooId;
+  bool _isSaving = false;
   late final AnimationController _chestBounceController;
   late final Animation<double> _chestBounce;
 
@@ -194,6 +195,16 @@ class _NewHinooPageState extends State<NewHinooPage>
   }
 
   Future<void> _submitHinoo() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+    try {
+      await _saveHinoo();
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _saveHinoo() async {
     const String writeHint = _kWriteHint;
     final dynamic rawDraft = (_builderKey.currentState as dynamic)
         ?.exportDraft();
@@ -990,7 +1001,7 @@ class _NewHinooPageState extends State<NewHinooPage>
                                 : (widget.isCampanello
                                       ? 'Salva il campanello'
                                       : 'Salva hinoo'),
-                            onPressed: _submitHinoo,
+                            onPressed: _isSaving ? null : _submitHinoo,
                           ),
                         if (_isWriteStep)
                           ResponsiveFooterAction(

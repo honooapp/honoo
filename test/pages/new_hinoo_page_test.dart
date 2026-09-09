@@ -1,3 +1,7 @@
+import 'dart:ui' as ui;
+import 'package:mocktail/mocktail.dart';
+import 'package:honoo/Widgets/responsive_footer_bar.dart';
+import '../test_supabase_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -9,6 +13,68 @@ import 'package:honoo/Entities/hinoo.dart';
 import 'package:sizer/sizer.dart';
 
 void main() {
+  setUpAll(registerSupabaseFallbacks);
+
+  testWidgets('double save inserts one hinoo and unlocks after completion', (
+    tester,
+  ) async {
+    final recorder = ui.PictureRecorder();
+    Canvas(recorder).drawColor(Colors.white, BlendMode.src);
+    final picture = recorder.endRecording();
+    final image = await tester.runAsync(() => picture.toImage(1, 1));
+    picture.dispose();
+    PaintingBinding.instance.imageCache.putIfAbsent(
+      const NetworkImage('https://example.com/bg.png'),
+      () =>
+          OneFrameImageStreamCompleter(Future.value(ImageInfo(image: image!))),
+    );
+    final harness = SupabaseTestHarness(withAuthenticatedUser: true)
+      ..enableOverrides();
+    addTearDown(harness.disableOverrides);
+    harness.stubTable('honoo').queueResponse([
+      {'id': 'existing-root'},
+    ]);
+    final chain = harness.stubTable('hinoo');
+    chain.queueResponse({'id': 'saved-hinoo'});
+    await tester.pumpWidget(
+      Sizer(
+        builder: (_, _, _) => const MaterialApp(
+          home: NewHinooPage(
+            initialDraft: HinooDraft(
+              pages: [
+                HinooSlide(
+                  backgroundImage: 'https://example.com/bg.png',
+                  text: 'Testo',
+                  isTextWhite: true,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final action = tester
+        .widgetList<ResponsiveFooterBar>(find.byType(ResponsiveFooterBar))
+        .expand((bar) => bar.actions)
+        .firstWhere((action) => action.tooltip == 'Salva hinoo');
+    action.onPressed!();
+    action.onPressed!();
+    await tester.pumpAndSettle();
+    verify(() => chain.insert(any())).called(1);
+    expect(
+      find.text("L'hinoo è stato salvato nel tuo Scrigno"),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('No'));
+    await tester.pumpAndSettle();
+    final nextAction = tester
+        .widgetList<ResponsiveFooterBar>(find.byType(ResponsiveFooterBar))
+        .expand((bar) => bar.actions)
+        .firstWhere((action) => action.tooltip == 'Salva hinoo');
+    expect(nextAction.onPressed, isNotNull);
+  });
+
   testWidgets(
     'il campanello mostra salva al centro solo dopo aver avviato una modifica',
     (tester) async {
