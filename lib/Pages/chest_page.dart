@@ -1220,13 +1220,33 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
               );
         return ThreadLayoutScaffold(
           backgroundColor: pageStyle.backgroundColor,
-          header: HonooAppTitle(
-            onTap: () {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const PlaceholderPage()),
-                (route) => false,
-              );
-            },
+          header: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: HonooAppTitle(
+                  onTap: () {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (_) => const PlaceholderPage(),
+                      ),
+                      (route) => false,
+                    );
+                  },
+                ),
+              ),
+              if (widget.casaFilter != null)
+                PositionedDirectional(
+                  start: 8,
+                  child: IconButton(
+                    tooltip: 'Indietro',
+                    color: pageStyle.foregroundColor,
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => Navigator.of(context).maybePop(),
+                  ),
+                ),
+            ],
           ),
           bodyBuilder: (ctx, viewW, availableH, layoutMode) {
             final HonooBuilderMetrics honooMetrics =
