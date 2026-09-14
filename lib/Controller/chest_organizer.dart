@@ -40,8 +40,8 @@ class ChestOrganizer {
         return !hasConversation && !isFromMoonSaved;
       case CasaChestFilter.moonSaved:
         return !hasConversation && isFromMoonSaved;
-      case CasaChestFilter.conversations:
-        return hasConversation;
+      case CasaChestFilter.all:
+        return true;
     }
   }
 
