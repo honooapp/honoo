@@ -41,13 +41,12 @@ enum CasaShareMode {
 
 /// Filtri di visualizzazione dello Scrigno aperto dalla propria casa.
 ///
-/// Sono distinti da [CasaShareMode]: `all` continua a significare "tutto"
-/// nelle autorizzazioni di condivisione, mentre qui le tre icone rappresentano
-/// categorie reciprocamente esclusive.
+/// Sono distinti da [CasaShareMode] perché regolano soltanto la visualizzazione
+/// dello Scrigno aperto dalla propria casa.
 enum CasaChestFilter {
   authored,
   moonSaved,
-  conversations;
+  all;
 
   String get label {
     switch (this) {
@@ -55,8 +54,8 @@ enum CasaChestFilter {
         return 'honoo e hinoo scritti da te';
       case CasaChestFilter.moonSaved:
         return 'honoo e hinoo salvati dalla luna';
-      case CasaChestFilter.conversations:
-        return 'conversazioni';
+      case CasaChestFilter.all:
+        return 'tutto';
     }
   }
 }

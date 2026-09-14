@@ -30,7 +30,7 @@ ChestOrganization<_Item> _organize(List<_Item> items) {
 }
 
 void main() {
-  test('i filtri dello Scrigno di casa sono reciprocamente esclusivi', () {
+  test('i filtri dello Scrigno di casa includono tutto con l’ultima icona', () {
     expect(
       ChestOrganizer.matchesCasaFilter(
         filter: CasaChestFilter.authored,
@@ -49,9 +49,17 @@ void main() {
     );
     expect(
       ChestOrganizer.matchesCasaFilter(
-        filter: CasaChestFilter.conversations,
+        filter: CasaChestFilter.all,
         isFromMoonSaved: true,
         hasConversation: true,
+      ),
+      isTrue,
+    );
+    expect(
+      ChestOrganizer.matchesCasaFilter(
+        filter: CasaChestFilter.all,
+        isFromMoonSaved: false,
+        hasConversation: false,
       ),
       isTrue,
     );

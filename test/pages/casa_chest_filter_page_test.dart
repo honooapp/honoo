@@ -37,4 +37,32 @@ void main() {
     await tester.pumpAndSettle();
     expect(result, CasaChestFilter.moonSaved);
   });
+
+  testWidgets('l’ultima icona apre tutte le categorie dello scrigno', (
+    tester,
+  ) async {
+    CasaChestFilter? result;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () async {
+              result = await Navigator.of(context).push<CasaChestFilter>(
+                MaterialPageRoute(builder: (_) => const CasaChestFilterPage()),
+              );
+            },
+            child: const Text('apri'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('apri'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('house-chest-all')));
+    await tester.pumpAndSettle();
+
+    expect(result, CasaChestFilter.all);
+  });
 }

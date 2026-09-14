@@ -64,14 +64,13 @@ class CasaChestFilterPage extends StatelessWidget {
                     SizedBox(height: spacing),
                     _ShareIcon(
                       key: const ValueKey('house-chest-all'),
-                      label: CasaChestFilter.conversations.label,
+                      label: CasaChestFilter.all.label,
                       asset: 'assets/icons/chest_home.svg',
                       selected: false,
                       size: iconSize,
                       addWhiteOutline: true,
-                      onTap: () => Navigator.of(
-                        context,
-                      ).pop(CasaChestFilter.conversations),
+                      onTap: () =>
+                          Navigator.of(context).pop(CasaChestFilter.all),
                     ),
                   ],
                 ),
