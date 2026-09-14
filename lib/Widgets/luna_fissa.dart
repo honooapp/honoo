@@ -63,6 +63,7 @@ class _LunaFissaState extends State<LunaFissa> with WidgetsBindingObserver {
   int _pendingRequests = 0;
   StreamSubscription<AuthState>? _authSub;
   RealtimeChannel? _invitesChannel;
+  Timer? _pendingRequestsRefreshTimer;
 
   @override
   void initState() {
@@ -82,6 +83,8 @@ class _LunaFissaState extends State<LunaFissa> with WidgetsBindingObserver {
     super.didUpdateWidget(oldWidget);
     if (!oldWidget.showAdminEntry && widget.showAdminEntry) {
       _loadAdminStatus();
+    } else if (oldWidget.showAdminEntry && !widget.showAdminEntry) {
+      _stopAdminUpdates();
     }
   }
 
@@ -101,9 +104,12 @@ class _LunaFissaState extends State<LunaFissa> with WidgetsBindingObserver {
     if (isAdmin) {
       _loadPendingRequestsCount();
       _subscribeInvites();
+      _pendingRequestsRefreshTimer ??= Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => _loadPendingRequestsCount(),
+      );
     } else {
-      _invitesChannel?.unsubscribe();
-      _invitesChannel = null;
+      _stopAdminUpdates();
       if (mounted) setState(() => _pendingRequests = 0);
     }
   }
@@ -128,17 +134,35 @@ class _LunaFissaState extends State<LunaFissa> with WidgetsBindingObserver {
             ChannelFilter(event: '*', schema: 'public', table: 'admin_stats_signal'),
             (_, [__]) => _loadPendingRequestsCount(),
           )
-          .subscribe();
+          .subscribe((status, [error]) {
+            if (status == 'SUBSCRIBED') {
+              _loadPendingRequestsCount();
+            } else if (status == 'CHANNEL_ERROR' ||
+                status == 'CLOSED' ||
+                status == 'TIMED_OUT') {
+              final channel = _invitesChannel;
+              _invitesChannel = null;
+              channel?.unsubscribe();
+            }
+          });
     } catch (error, stackTrace) {
       final failure = AppFailure.from(error, stackTrace);
       debugPrint('[LunaFissa] realtime subscription failed: $failure');
     }
   }
 
+  void _stopAdminUpdates() {
+    _pendingRequestsRefreshTimer?.cancel();
+    _pendingRequestsRefreshTimer = null;
+    _invitesChannel?.unsubscribe();
+    _invitesChannel = null;
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _authSub?.cancel();
+    _stopAdminUpdates();
     super.dispose();
   }
 

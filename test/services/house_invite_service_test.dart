@@ -52,6 +52,22 @@ void main() {
     when(() => chain.limit(any())).thenAnswer((_) => chain);
   });
 
+  test('verifica se la casa usa l\'immagine appena caricata', () async {
+    when(() => client.from('case')).thenAnswer((_) => chain);
+    chain.queueResponse([{'id': 'house-1'}]);
+
+    final result = await service.isHouseUsingImage(
+      userId: 'user-1',
+      imageUrl: 'https://example.com/house.png',
+    );
+
+    expect(result, isTrue);
+    verify(() => chain.eq('owner_id', 'user-1')).called(1);
+    verify(
+      () => chain.eq('house_image_url', 'https://example.com/house.png'),
+    ).called(1);
+  });
+
   test('hasPendingOrAcceptedInvite include richieste e inviti aperti', () async {
     chain.queueResponse([
       {'status': 'pending'}

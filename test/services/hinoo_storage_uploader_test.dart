@@ -43,6 +43,7 @@ void main() {
         )).thenAnswer((_) async => 'ignored-path-returned-by-upload');
     when(() => fileApi.getPublicUrl(any()))
         .thenReturn('https://cdn.example.com/hinoo/mock-url.png');
+    when(() => fileApi.remove(any())).thenAnswer((_) async => []);
   });
 
   tearDown(() {
@@ -157,5 +158,27 @@ void main() {
     );
     verifyNever(() => fileApi.uploadBinary(any(), any(),
         fileOptions: any(named: 'fileOptions')));
+  });
+
+  test('deleteBackgroundUrl rimuove soltanto il file dello stesso utente',
+      () async {
+    const url = 'https://project.supabase.co/storage/v1/object/public/'
+        'hinoo/u1/backgrounds/image.png';
+
+    await HinooStorageUploader.deleteBackgroundUrl(url: url, userId: 'u1');
+
+    verify(() => fileApi.remove(['u1/backgrounds/image.png'])).called(1);
+  });
+
+  test('deleteBackgroundUrl rifiuta il percorso di un altro utente',
+      () async {
+    const url = 'https://project.supabase.co/storage/v1/object/public/'
+        'hinoo/u2/backgrounds/image.png';
+
+    await expectLater(
+      HinooStorageUploader.deleteBackgroundUrl(url: url, userId: 'u1'),
+      throwsFormatException,
+    );
+    verifyNever(() => fileApi.remove(any()));
   });
 }

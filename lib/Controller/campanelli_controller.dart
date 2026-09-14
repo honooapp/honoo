@@ -292,6 +292,16 @@ class CampanelliController extends ChangeNotifier {
     return hasInvite;
   }
 
+  Future<bool> hasAuthorizedHouseInvite() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return false;
+    final email = user.email;
+    if (email != null && email.trim().isNotEmpty) {
+      await _houseInviteService.syncInvitesForEmail(email);
+    }
+    return _houseInviteService.hasAuthorizedInvite(user.id);
+  }
+
   Future<CasaRequestResult> requestHouseInvite() async {
     final user = _client.auth.currentUser;
     if (user == null) return CasaRequestResult.sessionAbsent;

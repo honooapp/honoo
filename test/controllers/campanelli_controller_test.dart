@@ -410,6 +410,28 @@ void main() {
     expect(controller.state.isInviteRequestBusy, isFalse);
   });
 
+  test('riconosce e sincronizza un invito autorizzato da riprendere', () async {
+    const user = User(
+      id: 'user-1',
+      appMetadata: {},
+      userMetadata: {},
+      aud: 'authenticated',
+      createdAt: '2026-07-18T12:00:00Z',
+      email: 'user@example.com',
+    );
+    when(() => auth.currentUser).thenReturn(user);
+    when(() => houseInviteService.syncInvitesForEmail('user@example.com'))
+        .thenAnswer((_) async {});
+    when(() => houseInviteService.hasAuthorizedInvite('user-1'))
+        .thenAnswer((_) async => true);
+
+    expect(await controller.hasAuthorizedHouseInvite(), isTrue);
+    verify(
+      () => houseInviteService.syncInvitesForEmail('user@example.com'),
+    ).called(1);
+    verify(() => houseInviteService.hasAuthorizedInvite('user-1')).called(1);
+  });
+
   test('registra la richiesta e aggiorna lo stato solo dopo il successo',
       () async {
     final createdAt = DateTime.utc(2026, 7, 18, 12);

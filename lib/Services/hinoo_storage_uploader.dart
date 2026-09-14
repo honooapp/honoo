@@ -108,6 +108,30 @@ class HinooStorageUploader {
     );
   }
 
+  /// Removes a background returned by [uploadBackground].
+  static Future<void> deleteBackgroundUrl({
+    required String url,
+    required String userId,
+  }) async {
+    _assertUserId(userId);
+    final uri = Uri.tryParse(url);
+    if (uri == null) throw const FormatException('URL Storage non valido');
+    final segments = uri.pathSegments;
+    final marker = segments.indexOf('public');
+    if (marker < 0 ||
+        marker + 2 >= segments.length ||
+        segments[marker + 1] != bucket) {
+      throw const FormatException('URL Storage non riconosciuto');
+    }
+    final path = segments.skip(marker + 2).join('/');
+    if (!path.startsWith('$userId/backgrounds/')) {
+      throw const FormatException('Percorso Storage non autorizzato');
+    }
+    await _reliability.write(
+      () => _client.storage.from(bucket).remove([path]),
+    );
+  }
+
   /// Export PNG → hinoo/<userId>/exports/<uuid>.png
   static Future<String> uploadExportPng({
     required Uint8List pngBytes,

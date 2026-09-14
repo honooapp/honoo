@@ -20,6 +20,21 @@ class HouseInviteService {
     return rows is List && rows.isNotEmpty;
   }
 
+  Future<bool> isHouseUsingImage({
+    required String userId,
+    required String imageUrl,
+  }) async {
+    final rows = await _request(
+      () => _client
+          .from('case')
+          .select('id')
+          .eq('owner_id', userId)
+          .eq('house_image_url', imageUrl)
+          .limit(1),
+    );
+    return rows is List && rows.isNotEmpty;
+  }
+
   Future<bool> hasPendingOrAcceptedInvite(String userId) async {
     final rows = await _request(
       () => _client

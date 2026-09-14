@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:honoo/Pages/new_hinoo_page.dart';
 import 'package:honoo/Services/house_invite_service.dart';
+import 'package:honoo/Services/house_invite_prompt_controller.dart';
 import 'package:honoo/Services/supabase_provider.dart';
 import 'package:honoo/Widgets/honoo_dialogs.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -42,6 +43,7 @@ class _GlobalInviteListenerState extends State<GlobalInviteListener>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    HouseInvitePromptController.requests.addListener(_resumeInviteFlow);
     if (widget.enabled) {
       _start();
     }
@@ -62,12 +64,19 @@ class _GlobalInviteListenerState extends State<GlobalInviteListener>
     _inviteChannel?.unsubscribe();
     _inviteEmailChannel?.unsubscribe();
     _authSub?.cancel();
+    HouseInvitePromptController.requests.removeListener(_resumeInviteFlow);
     super.dispose();
+  }
+
+  void _resumeInviteFlow() {
+    _inviteDeferred = false;
+    unawaited(_checkInviteFlow());
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && widget.enabled) {
+      _inviteDeferred = false;
       unawaited(_checkInviteFlow());
     }
   }

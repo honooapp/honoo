@@ -159,11 +159,14 @@ class _CasaBuilderPageState extends State<CasaBuilderPage> {
       _isSaving = true;
       _error = null;
     });
+    String? newlyUploadedImageUrl;
+    String? authenticatedUserId;
     try {
       final user = SupabaseProvider.client.auth.currentUser;
       if (user == null) {
         throw Exception('Utente non autenticato.');
       }
+      authenticatedUserId = user.id;
 
       String imageUrl = widget.initialHouseImageUrl ?? '';
       if (_hasPickedImage || imageUrl.isEmpty) {
@@ -180,6 +183,7 @@ class _CasaBuilderPageState extends State<CasaBuilderPage> {
           // lenti può richiedere più dei 15 secondi usati dagli upload normali.
           writeTimeout: const Duration(minutes: 1),
         );
+        newlyUploadedImageUrl = imageUrl;
         setState(() => _isUploadingImage = false);
       }
 
@@ -198,6 +202,21 @@ class _CasaBuilderPageState extends State<CasaBuilderPage> {
         );
       }
 
+      final oldImageUrl = widget.initialHouseImageUrl;
+      if (newlyUploadedImageUrl != null &&
+          oldImageUrl != null &&
+          oldImageUrl.isNotEmpty &&
+          oldImageUrl != newlyUploadedImageUrl) {
+        try {
+          await HinooStorageUploader.deleteBackgroundUrl(
+            url: oldImageUrl,
+            userId: user.id,
+          );
+        } catch (cleanupError) {
+          debugPrint('[CasaBuilder] old image cleanup failed: $cleanupError');
+        }
+      }
+
       if (!mounted) return;
       showHonooToast(
         context,
@@ -212,6 +231,32 @@ class _CasaBuilderPageState extends State<CasaBuilderPage> {
         (route) => false,
       );
     } catch (e) {
+      if (newlyUploadedImageUrl != null && authenticatedUserId != null) {
+        var canDeleteUpload = false;
+        try {
+          canDeleteUpload = !await _inviteService.isHouseUsingImage(
+            userId: authenticatedUserId,
+            imageUrl: newlyUploadedImageUrl,
+          );
+        } catch (verificationError) {
+          debugPrint(
+            '[CasaBuilder] image cleanup verification failed: '
+            '$verificationError',
+          );
+        }
+        if (canDeleteUpload) {
+          try {
+            await HinooStorageUploader.deleteBackgroundUrl(
+              url: newlyUploadedImageUrl,
+              userId: authenticatedUserId,
+            );
+          } catch (cleanupError) {
+            debugPrint(
+              '[CasaBuilder] failed upload cleanup failed: $cleanupError',
+            );
+          }
+        }
+      }
       if (!mounted) return;
       setState(() => _error = 'Errore creazione casa: $e');
     } finally {

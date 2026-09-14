@@ -30,6 +30,7 @@ import 'package:honoo/Controller/honoo_controller.dart';
 import 'package:honoo/Widgets/desktop_carousel_arrows.dart';
 import 'package:honoo/Widgets/busy_overlay.dart';
 import 'package:honoo/Services/campanelli_repository.dart';
+import 'package:honoo/Services/house_invite_prompt_controller.dart';
 
 import '../../Pages/home_page.dart';
 import '../../Pages/email_login_page.dart';
@@ -451,7 +452,12 @@ class _CampanelliPageState extends State<CampanelliPage>
         return;
       }
       if (_hasPendingOrAcceptedInvite) {
-        if (mounted) {
+        final hasAuthorizedInvite = await _campanelliController
+            .hasAuthorizedHouseInvite();
+        if (!mounted) return;
+        if (hasAuthorizedInvite) {
+          HouseInvitePromptController.requestOpen();
+        } else {
           showHonooToast(context, message: 'Hai già una richiesta in corso.');
         }
         return;
