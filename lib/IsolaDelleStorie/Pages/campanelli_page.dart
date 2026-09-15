@@ -211,6 +211,7 @@ class _CampanelliPageState extends State<CampanelliPage>
         controller,
         delta: delta.isNegative ? -1 : 1,
         maxIndex: maxIndex,
+        debounceWheelEvents: true,
       ),
     );
   }
@@ -219,9 +220,11 @@ class _CampanelliPageState extends State<CampanelliPage>
     PageController controller, {
     required int delta,
     required int maxIndex,
+    bool debounceWheelEvents = false,
   }) async {
     if (_isPageNavigationLocked ||
-        DateTime.now().isBefore(_ignorePageNavigationUntil) ||
+        (debounceWheelEvents &&
+            DateTime.now().isBefore(_ignorePageNavigationUntil)) ||
         !controller.hasClients) {
       return;
     }
@@ -238,11 +241,13 @@ class _CampanelliPageState extends State<CampanelliPage>
       );
     } finally {
       _isPageNavigationLocked = false;
-      // Trackpad e rotelline inviano una coda di eventi per lo stesso gesto.
-      // Il breve debounce evita che la stessa inerzia avanzi altre pagine.
-      _ignorePageNavigationUntil = DateTime.now().add(
-        const Duration(milliseconds: 120),
-      );
+      if (debounceWheelEvents) {
+        // Trackpad e rotelline inviano una coda di eventi per lo stesso gesto.
+        // Il breve debounce evita che la stessa inerzia avanzi altre pagine.
+        _ignorePageNavigationUntil = DateTime.now().add(
+          const Duration(milliseconds: 120),
+        );
+      }
     }
   }
 
