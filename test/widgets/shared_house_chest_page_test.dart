@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:honoo/Pages/shared_house_chest_page.dart';
+import 'package:honoo/UI/unified_thread_view.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../test_supabase_helper.dart';
@@ -50,12 +51,24 @@ void main() {
         ),
       ).thenAnswer((_) => rpc);
       await tester.pumpWidget(
-        const MaterialApp(home: SharedHouseChestPage(ownerId: 'owner-id')),
+        MaterialApp(
+          home: SharedHouseChestPage(
+            ownerId: 'owner-id',
+            conversationLoader: (_) async => const [],
+          ),
+        ),
       );
       await tester.pumpAndSettle();
       if (kind == 'empty') {
         expect(find.byTooltip('Rispondi'), findsNothing);
       } else {
+        expect(find.byType(UnifiedThreadView), findsOneWidget);
+        expect(
+          tester
+              .widget<UnifiedThreadView>(find.byType(UnifiedThreadView))
+              .conversationId,
+          'thread-id',
+        );
         await tester.tap(find.byTooltip('Rispondi'));
         await tester.pumpAndSettle();
         expect(find.widgetWithText(ElevatedButton, 'honoo'), findsOneWidget);

@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:honoo/IsolaDelleStorie/Pages/campanelli_page.dart';
@@ -23,23 +24,30 @@ void main() {
 
   tearDown(() => harness.disableOverrides());
 
-  Future<void> pumpAtSize(WidgetTester tester, Size size) async {
+  Future<void> pumpAtSize(
+    WidgetTester tester,
+    Size size, {
+    List<Map<String, Object?>>? publicCampanelli,
+  }) async {
     final rpc = MockQueryChain();
-    rpc.queueResponse(const [
-      {
-        'admin_email': 'venceslao.cembalo@gmail.com',
-        'campanello_hinoo_id': 'hinoo-venceslao',
-        'owner_id': 'admin-venceslao',
-        'house_image_url': null,
-        'pages': [
-          {
-            'backgroundImage': null,
-            'text': 'Campanello di Venceslao',
-            'isTextWhite': true,
-          },
-        ],
-      },
-    ]);
+    rpc.queueResponse(
+      publicCampanelli ??
+          const [
+            {
+              'admin_email': 'venceslao.cembalo@gmail.com',
+              'campanello_hinoo_id': 'hinoo-venceslao',
+              'owner_id': 'admin-venceslao',
+              'house_image_url': null,
+              'pages': [
+                {
+                  'backgroundImage': null,
+                  'text': 'Campanello di Venceslao',
+                  'isTextWhite': true,
+                },
+              ],
+            },
+          ],
+    );
     when(
       () => harness.client.rpc('get_public_admin_campanelli'),
     ).thenAnswer((_) => rpc);
@@ -88,6 +96,66 @@ void main() {
       find.byKey(const ValueKey<String>('campanelli_carousel_arrows')),
     );
     expect(arrows.opacity, 0);
+  });
+
+  testWidgets('una raffica della rotellina avanza un solo campanello', (
+    tester,
+  ) async {
+    await pumpAtSize(
+      tester,
+      const Size(1200, 900),
+      publicCampanelli: const [
+        {
+          'admin_email': 'uno@example.com',
+          'campanello_hinoo_id': 'hinoo-uno',
+          'owner_id': 'admin-uno',
+          'house_image_url': null,
+          'pages': [
+            {'text': 'Primo campanello'},
+          ],
+        },
+        {
+          'admin_email': 'due@example.com',
+          'campanello_hinoo_id': 'hinoo-due',
+          'owner_id': 'admin-due',
+          'house_image_url': null,
+          'pages': [
+            {'text': 'Secondo campanello'},
+          ],
+        },
+        {
+          'admin_email': 'tre@example.com',
+          'campanello_hinoo_id': 'hinoo-tre',
+          'owner_id': 'admin-tre',
+          'house_image_url': null,
+          'pages': [
+            {'text': 'Terzo campanello'},
+          ],
+        },
+      ],
+    );
+    await tester.pumpAndSettle();
+    final position = tester.getCenter(find.byType(CampanelloCard));
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    await mouse.moveTo(position);
+    await tester.pump();
+
+    for (var i = 0; i < 4; i++) {
+      tester.binding.handlePointerEvent(
+        PointerScrollEvent(
+          position: position,
+          kind: PointerDeviceKind.mouse,
+          scrollDelta: const Offset(0, 120),
+        ),
+      );
+    }
+    await tester.pumpAndSettle();
+    await mouse.removePointer();
+
+    final card = tester.widget<CampanelloCard>(find.byType(CampanelloCard));
+    expect(card.data.text, 'Primo campanello');
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Entra fa scorrere la casa dal basso fino a riempire la pagina', (

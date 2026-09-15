@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../Entities/chest_item.dart';
+import '../Entities/conversation_entry.dart';
 import '../Entities/conversation_link.dart';
 import '../Entities/honoo.dart';
 import '../Entities/hinoo.dart';
@@ -12,14 +13,21 @@ import 'new_hinoo_page.dart';
 import '../Services/house_shared_content_service.dart';
 import '../UI/hinoo_viewer.dart';
 import '../UI/honoo_card.dart';
+import '../UI/unified_thread_view.dart';
 import '../Utility/honoo_colors.dart';
 import '../Widgets/honoo_app_title.dart';
 import '../Widgets/loading_spinner.dart';
 
 class SharedHouseChestPage extends StatefulWidget {
-  const SharedHouseChestPage({super.key, required this.ownerId});
+  const SharedHouseChestPage({
+    super.key,
+    required this.ownerId,
+    this.conversationLoader,
+  });
 
   final String ownerId;
+  final Future<List<ConversationEntry>> Function(String conversationId)?
+  conversationLoader;
 
   @override
   State<SharedHouseChestPage> createState() => _SharedHouseChestPageState();
@@ -137,6 +145,26 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
         onPageChanged: (value) => setState(() => _index = value),
         itemBuilder: (context, index) {
           final item = _items[index];
+          final conversationId = item.when(
+            honoo: (honoo) {
+              final explicitId = honoo.conversationId;
+              if (explicitId != null && explicitId.isNotEmpty) {
+                return explicitId;
+              }
+              return honoo.hasReplies ? honoo.dbId : null;
+            },
+            hinoo: (hinoo) =>
+                hinoo.conversationId ?? hinoo.draft.conversationId,
+          );
+          if (conversationId != null && conversationId.isNotEmpty) {
+            return UnifiedThreadView(
+              conversationId: conversationId,
+              maxWidth: constraints.maxWidth,
+              maxHeight: constraints.maxHeight,
+              isActive: index == _index,
+              conversationLoader: widget.conversationLoader,
+            );
+          }
           return item.when(
             honoo: (honoo) => Center(
               child: SizedBox(

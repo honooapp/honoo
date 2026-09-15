@@ -523,8 +523,27 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
   // conversation loading removed — UnifiedThreadView handles it
 
   String? _convIdOfItem(ChestItem it) => it.when(
-    honoo: (h) => h.conversationId,
-    hinoo: (row) => row.conversationId ?? row.draft.conversationId,
+    honoo: (honoo) {
+      final explicitId = honoo.conversationId;
+      if (explicitId != null && explicitId.isNotEmpty) return explicitId;
+      final rootId = honoo.dbId;
+      if (rootId == null || rootId.isEmpty) return null;
+      final hasActivity =
+          honoo.hasReplies ||
+          _honooLatestReplies.containsKey(rootId) ||
+          _hinooLatestReplies.containsKey(rootId);
+      return hasActivity ? rootId : null;
+    },
+    hinoo: (hinoo) {
+      final explicitId = hinoo.conversationId ?? hinoo.draft.conversationId;
+      if (explicitId != null && explicitId.isNotEmpty) return explicitId;
+      final rootId = hinoo.id;
+      final hasActivity =
+          _honooLatestReplies.containsKey(rootId) ||
+          _hinooLatestReplies.containsKey(rootId) ||
+          (_hinooRepliesByRoot[rootId]?.isNotEmpty ?? false);
+      return hasActivity ? rootId : null;
+    },
   );
 
   String? _conversationIdForItemFilter(ChestItem item) => item.when(

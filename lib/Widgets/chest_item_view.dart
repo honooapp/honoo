@@ -74,40 +74,22 @@ class ChestItemView extends StatelessWidget {
       item,
       viewerUserId: viewerUserId,
     );
+    final conversationId = _effectiveConversationId();
     final content = item.when(
-      honoo: (honoo) => _buildHonoo(honoo),
-      hinoo: (hinoo) => _buildHinoo(hinoo, cardWidth, cardHeight),
+      honoo: (honoo) => _buildHonoo(honoo, conversationId),
+      hinoo: (hinoo) =>
+          _buildHinoo(hinoo, cardWidth, cardHeight, conversationId),
     );
-    final isConversation = item.when(
-      honoo: (honoo) =>
-          isNormalMode &&
-          honoo.conversationId != null &&
-          honoo.conversationId!.isNotEmpty,
-      hinoo: (hinoo) {
-        final conversationId =
-            hinoo.conversationId ?? hinoo.draft.conversationId;
-        return (isNormalMode &&
-                conversationId != null &&
-                conversationId.isNotEmpty) ||
-            (hinooRepliesByRoot[hinoo.id]?.isNotEmpty ?? false);
-      },
-    );
+    final isConversation =
+        isNormalMode && conversationId != null && conversationId.isNotEmpty;
     final card = isConversation
         ? content
         : ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: SizedBox(width: cardWidth, child: content),
           );
-    final threadId = item.when(
-      honoo: (h) => h.conversationId,
-      hinoo: (h) => h.conversationId ?? h.draft.conversationId,
-    );
     final keyedCard = KeyedSubtree(
-      key: ValueKey(
-        isConversation && threadId?.isNotEmpty == true
-            ? 'conversation:$threadId'
-            : identity,
-      ),
+      key: ValueKey(isConversation ? 'conversation:$conversationId' : identity),
       child: ColoredBox(
         color: isConversation ? Colors.transparent : pageStyle.backgroundColor,
         child: SizedBox(width: maxWidth, height: availableHeight, child: card),
@@ -128,8 +110,20 @@ class ChestItemView extends StatelessWidget {
     return keyedCard;
   }
 
-  Widget _buildHonoo(Honoo honoo) {
-    final conversationId = honoo.conversationId;
+  String? _effectiveConversationId() => item.when(
+    honoo: (honoo) {
+      final explicitId = honoo.conversationId;
+      if (explicitId != null && explicitId.isNotEmpty) return explicitId;
+      return honoo.hasReplies ? honoo.dbId : null;
+    },
+    hinoo: (hinoo) {
+      final explicitId = hinoo.conversationId ?? hinoo.draft.conversationId;
+      if (explicitId != null && explicitId.isNotEmpty) return explicitId;
+      return hinooRepliesByRoot[hinoo.id]?.isNotEmpty == true ? hinoo.id : null;
+    },
+  );
+
+  Widget _buildHonoo(Honoo honoo, String? conversationId) {
     if (isNormalMode && conversationId != null && conversationId.isNotEmpty) {
       return _unifiedThread(conversationId);
     }
@@ -148,8 +142,8 @@ class ChestItemView extends StatelessWidget {
     ChestHinooItem hinoo,
     double cardWidth,
     double cardHeight,
+    String? conversationId,
   ) {
-    final conversationId = hinoo.conversationId ?? hinoo.draft.conversationId;
     if (isNormalMode && conversationId != null && conversationId.isNotEmpty) {
       return _unifiedThread(conversationId);
     }

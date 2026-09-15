@@ -68,7 +68,10 @@ class _CampanelliPageState extends State<CampanelliPage>
   final PageController _campanelloPageController = PageController();
   List<_CampanelloEntry> _userEntries = const [];
   bool _isLoadingUserEntries = false;
-  bool _isHoveringCampanelli = false;
+  bool _isPageNavigationLocked = false;
+  DateTime _ignorePageNavigationUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  Offset? _desktopDragStart;
+  int? _desktopDragPointer;
   bool _showCarouselArrows = true;
   Timer? _carouselHintTimer;
   bool _isKnocking = false;
@@ -183,8 +186,12 @@ class _CampanelliPageState extends State<CampanelliPage>
     PageController controller,
     PointerScrollEvent event,
     Axis axis,
+    int maxIndex,
   ) {
-    if (!controller.hasClients || !controller.position.haveDimensions) {
+    if (_isPageNavigationLocked ||
+        DateTime.now().isBefore(_ignorePageNavigationUntil) ||
+        !controller.hasClients ||
+        !controller.position.haveDimensions) {
       return;
     }
     final position = controller.position;
@@ -199,26 +206,88 @@ class _CampanelliPageState extends State<CampanelliPage>
     if (delta.abs() < 0.5) {
       return;
     }
-    final double target = (position.pixels + delta).clamp(
-      position.minScrollExtent,
-      position.maxScrollExtent,
+    unawaited(
+      _animatePage(
+        controller,
+        delta: delta.isNegative ? -1 : 1,
+        maxIndex: maxIndex,
+      ),
     );
-    if ((target - position.pixels).abs() > 0.5) {
-      controller.jumpTo(target);
-    }
   }
 
-  void _animatePage(
+  Future<void> _animatePage(
     PageController controller, {
     required int delta,
     required int maxIndex,
-  }) {
-    if (!controller.hasClients) return;
+  }) async {
+    if (_isPageNavigationLocked ||
+        DateTime.now().isBefore(_ignorePageNavigationUntil) ||
+        !controller.hasClients) {
+      return;
+    }
     final double? page = controller.page;
     final int current = page?.round() ?? controller.initialPage;
     final int target = (current + delta).clamp(0, maxIndex);
     if (target == current) return;
-    controller.animateToPage(target, duration: _kAnimFast, curve: _kCurve);
+    _isPageNavigationLocked = true;
+    try {
+      await controller.animateToPage(
+        target,
+        duration: _kAnimFast,
+        curve: _kCurve,
+      );
+    } finally {
+      _isPageNavigationLocked = false;
+      // Trackpad e rotelline inviano una coda di eventi per lo stesso gesto.
+      // Il breve debounce evita che la stessa inerzia avanzi altre pagine.
+      _ignorePageNavigationUntil = DateTime.now().add(
+        const Duration(milliseconds: 120),
+      );
+    }
+  }
+
+  void _startDesktopDrag(PointerDownEvent event) {
+    _desktopDragPointer = event.pointer;
+    _desktopDragStart = event.position;
+  }
+
+  void _endDesktopDrag(
+    PointerUpEvent event, {
+    required int maxCampanelloIndex,
+    required int maxVerticalIndex,
+  }) {
+    if (_desktopDragPointer != event.pointer || _desktopDragStart == null) {
+      return;
+    }
+    final offset = event.position - _desktopDragStart!;
+    _desktopDragPointer = null;
+    _desktopDragStart = null;
+    if (math.max(offset.dx.abs(), offset.dy.abs()) < 48) return;
+    if (offset.dy.abs() > offset.dx.abs()) {
+      unawaited(
+        _animatePage(
+          _pageController,
+          delta: offset.dy.isNegative ? 1 : -1,
+          maxIndex: maxVerticalIndex,
+        ),
+      );
+      return;
+    }
+    if (_verticalPageIndex == 0) {
+      unawaited(
+        _animatePage(
+          _campanelloPageController,
+          delta: offset.dx.isNegative ? 1 : -1,
+          maxIndex: maxCampanelloIndex,
+        ),
+      );
+    }
+  }
+
+  void _cancelDesktopDrag(PointerCancelEvent event) {
+    if (_desktopDragPointer != event.pointer) return;
+    _desktopDragPointer = null;
+    _desktopDragStart = null;
   }
 
   Future<void> _handleKnock(CampanelloData campanello) async {
@@ -1038,6 +1107,12 @@ class _CampanelliPageState extends State<CampanelliPage>
             layoutMode,
           );
           final bool isMobile = layoutMode == ResponsiveLayoutMode.mobile;
+          final bool usesDesktopPointerNavigation = switch (layoutMode) {
+            ResponsiveLayoutMode.desktop ||
+            ResponsiveLayoutMode.wideDesktop ||
+            ResponsiveLayoutMode.largeDesktop => true,
+            ResponsiveLayoutMode.mobile || ResponsiveLayoutMode.tablet => false,
+          };
           final double footerBottomPadding =
               ResponsiveLayout.footerBottomPaddingForMode(layoutMode) +
               (isMobile ? 0 : 12);
@@ -1099,9 +1174,11 @@ class _CampanelliPageState extends State<CampanelliPage>
               activeCampanello != null &&
               user != null &&
               activeCampanello.ownerId == user.id;
-          final ScrollPhysics pagePhysics = const PageScrollPhysics().applyTo(
-            const BouncingScrollPhysics(),
-          );
+          final ScrollPhysics pagePhysics = usesDesktopPointerNavigation
+              ? const NeverScrollableScrollPhysics()
+              : const PageScrollPhysics().applyTo(
+                  const BouncingScrollPhysics(),
+                );
           const int verticalPages = 2;
           final int maxCampanelloIndex = math.max(
             0,
@@ -1161,16 +1238,39 @@ class _CampanelliPageState extends State<CampanelliPage>
                 SizedBox(
                   height: maxHeight,
                   child: Listener(
-                    onPointerDown: (_) => _revealCarouselArrows(),
-                    onPointerSignal: (event) {
-                      if (event is PointerScrollEvent &&
-                          !_isHoveringCampanelli) {
-                        _handlePointerScroll(
-                          _pageController,
-                          event,
-                          Axis.vertical,
-                        );
+                    onPointerDown: (event) {
+                      _revealCarouselArrows();
+                      if (usesDesktopPointerNavigation) {
+                        _startDesktopDrag(event);
                       }
+                    },
+                    onPointerUp: usesDesktopPointerNavigation
+                        ? (event) => _endDesktopDrag(
+                            event,
+                            maxCampanelloIndex: maxCampanelloIndex,
+                            maxVerticalIndex: maxVerticalIndex,
+                          )
+                        : null,
+                    onPointerCancel: usesDesktopPointerNavigation
+                        ? _cancelDesktopDrag
+                        : null,
+                    onPointerSignal: (event) {
+                      if (event is! PointerScrollEvent) return;
+                      if (_verticalPageIndex == 0) {
+                        _handlePointerScroll(
+                          _campanelloPageController,
+                          event,
+                          Axis.horizontal,
+                          maxCampanelloIndex,
+                        );
+                        return;
+                      }
+                      _handlePointerScroll(
+                        _pageController,
+                        event,
+                        Axis.vertical,
+                        maxVerticalIndex,
+                      );
                     },
                     child: ScrollConfiguration(
                       behavior: ScrollConfiguration.of(context).copyWith(
@@ -1214,8 +1314,6 @@ class _CampanelliPageState extends State<CampanelliPage>
                                 width: canvasSize.width,
                                 height: canvasSize.height,
                                 child: MouseRegion(
-                                  onEnter: (_) => _isHoveringCampanelli = true,
-                                  onExit: (_) => _isHoveringCampanelli = false,
                                   child: Listener(
                                     onPointerSignal: (event) {
                                       if (event is PointerScrollEvent) {
@@ -1223,6 +1321,7 @@ class _CampanelliPageState extends State<CampanelliPage>
                                           _campanelloPageController,
                                           event,
                                           Axis.horizontal,
+                                          maxCampanelloIndex,
                                         );
                                       }
                                     },

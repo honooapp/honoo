@@ -220,4 +220,63 @@ void main() {
       findsNothing,
     );
   });
+
+  testWidgets(
+    'un Honoo storico con risposte usa la radice come id conversazione',
+    (tester) async {
+      final root =
+          Honoo(
+              0,
+              'Conversazione storica',
+              '',
+              '2026-07-25T10:00:00Z',
+              '',
+              'test_user',
+              HonooType.personal,
+            )
+            ..dbId = 'legacy-root'
+            ..hasReplies = true;
+      harness.stubTable('honoo').queueResponse([]);
+      harness.stubTable('hinoo').queueResponse([]);
+      harness.stubTable('conversation_tombstones').queueResponse([]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChestItemView(
+              item: ChestItem.honoo(root, DateTime.utc(2026, 7, 25)),
+              availableHeight: 600,
+              maxWidth: 800,
+              honooMetrics: ResponsiveLayout.honooBuilderMetrics(
+                availableHeight: 600,
+                maxWidth: 800,
+                mode: ResponsiveLayoutMode.desktop,
+              ),
+              repaintKey: GlobalKey(),
+              hinooRepliesByRoot: const {},
+              isNormalMode: true,
+              isActive: true,
+              highlightLatest: false,
+              focusConversationId: null,
+              revealEntryId: null,
+              onSelectConversationEntry: (_) {},
+              onDownload: (_) {},
+              conversationRefreshToken: 0,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(UnifiedThreadView), findsOneWidget);
+      expect(
+        tester
+            .widget<UnifiedThreadView>(find.byType(UnifiedThreadView))
+            .conversationId,
+        'legacy-root',
+      );
+      expect(find.byType(HonooCard), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
