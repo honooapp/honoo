@@ -5,6 +5,7 @@ import 'package:honoo/Pages/email_login_page.dart';
 import 'package:honoo/Widgets/campanello_card.dart';
 import 'package:honoo/Widgets/campanelli_footer.dart';
 import 'package:honoo/Widgets/busy_overlay.dart';
+import 'package:honoo/Widgets/casa_section.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../test_supabase_helper.dart';
@@ -185,7 +186,91 @@ void main() {
       tester.widget<CampanelliFooter>(find.byType(CampanelliFooter)).onKnock();
       await tester.pumpAndSettle();
       expect(find.text('Entra pure a casa mia'), findsOneWidget);
+      await tester.tap(find.text('Non ora'));
+      await tester.pumpAndSettle();
+
+      // Una revoca successiva deve chiudere la casa anche senza riaprire la pagina.
+      houseAccess.queueResponse(const []);
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pumpAndSettle();
+      tester.widget<CampanelliFooter>(find.byType(CampanelliFooter)).onKnock();
+      await tester.pumpAndSettle();
+      expect(find.text('Entra pure a casa mia'), findsNothing);
+      verify(() => houseAccess.insert(any())).called(1);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets('dopo la modifica della casa resta sul campanello selezionato', (
+    tester,
+  ) async {
+    harness.disableOverrides();
+    harness = SupabaseTestHarness(withAuthenticatedUser: true);
+    harness.enableOverrides();
+
+    final houses = harness.stubTable('case');
+    final settings = harness.stubTable('house_share_settings');
+    final hinoo = harness.stubTable('hinoo');
+    final houseAccess = harness.stubTable('house_access');
+    final houseInvites = harness.stubTable('house_invites');
+    when(() => harness.user.email).thenReturn('utente@example.com');
+    when(
+      () => houseAccess.not('granted_at', 'is', null),
+    ).thenAnswer((_) => houseAccess);
+
+    const houseRows = [
+      {
+        'campanello_hinoo_id': 'owned',
+        'owner_id': 'test_user',
+        'created_at': '2026-08-04T10:00:00Z',
+      },
+    ];
+    const hinooRows = [
+      {
+        'id': 'owned',
+        'pages': [
+          {'text': 'Il mio campanello'},
+        ],
+      },
+    ];
+    houses
+      ..queueResponse(houseRows)
+      ..queueResponse(houseRows);
+    settings
+      ..queueResponse(const [])
+      ..queueResponse(const []);
+    hinoo
+      ..queueResponse(hinooRows)
+      ..queueResponse(hinooRows);
+    houseAccess
+      ..queueResponse(const [])
+      ..queueResponse(const []);
+    houseInvites
+      ..queueResponse(const [])
+      ..queueResponse(const []);
+
+    await tester.pumpWidget(const MaterialApp(home: CampanelliPage()));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(CampanelloCard), const Offset(-500, 0));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<CampanelloCard>(find.byType(CampanelloCard)).data.text,
+      'Il mio campanello',
+    );
+
+    await tester.drag(find.byType(CampanelloCard), const Offset(0, -900));
+    await tester.pumpAndSettle();
+    final houseContext = tester.element(find.byType(CasaSection));
+    tester.widget<CasaSection>(find.byType(CasaSection)).onEditTap!();
+    await tester.pump();
+    Navigator.of(houseContext).pop(true);
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(CasaSection), const Offset(0, 900));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<CampanelloCard>(find.byType(CampanelloCard)).data.text,
+      'Il mio campanello',
+    );
+  });
 }

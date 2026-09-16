@@ -120,13 +120,17 @@ class _CampanelliPageState extends State<CampanelliPage>
       final tags = await _campanelliController.loadGrantedHouseTags(user.id);
       if (!mounted) return;
       setState(() {
-        _unlockedCampanelli.addAll(
-          _userEntries
-              .where(
-                (entry) => tags.contains(entry.campanello.campanelloHinooId),
-              )
-              .map((entry) => entry.campanello.id),
-        );
+        _unlockedCampanelli
+          ..clear()
+          ..addAll(
+            _userEntries
+                .where(
+                  (entry) =>
+                      entry.campanello.ownerId == user.id ||
+                      tags.contains(entry.campanello.campanelloHinooId),
+                )
+                .map((entry) => entry.campanello.id),
+          );
       });
     } catch (error) {
       debugPrint('[Campanelli] access refresh failed: $error');
@@ -648,6 +652,14 @@ class _CampanelliPageState extends State<CampanelliPage>
 
   Future<void> _loadUserEntries() async {
     if (_isLoadingUserEntries) return;
+    final previousCampanelli = _buildCampanelli();
+    final previousPage = _verticalPageIndex == 1
+        ? _lastHouseCampanelloIndex
+        : _campanelloIndex;
+    final previousCampanelloId =
+        previousPage > 0 && previousPage <= previousCampanelli.length
+        ? previousCampanelli[previousPage - 1].campanello.id
+        : null;
     final user = SupabaseProvider.client.auth.currentUser;
     if (user == null) {
       await _loadPublicAdminEntries();
@@ -664,6 +676,9 @@ class _CampanelliPageState extends State<CampanelliPage>
           setState(() {
             _userEntries = const [];
             _ownedHinooIds = const [];
+            _unlockedCampanelli.clear();
+            _campanelloIndex = 0;
+            _lastHouseCampanelloIndex = 0;
           });
         }
         return;
@@ -711,34 +726,41 @@ class _CampanelliPageState extends State<CampanelliPage>
       );
 
       if (mounted) {
+        final sortedEntries = <_CampanelloEntry>[
+          ...entries.where((entry) => entry.campanello.ownerId == user.id),
+          ...entries.where((entry) => entry.campanello.ownerId != user.id),
+        ];
+        final previousEntryIndex = sortedEntries.indexWhere(
+          (entry) => entry.campanello.id == previousCampanelloId,
+        );
+        final targetPage = previousCampanelloId == null
+            ? 0
+            : previousEntryIndex >= 0
+            ? previousEntryIndex + 1
+            : previousPage.clamp(0, entries.length);
         setState(() {
           _userEntries = entries;
           _ownedHinooIds = List<String>.from(ownedHinooIds);
-          _unlockedCampanelli.addAll(
-            entries
-                .where(
-                  (entry) =>
-                      entry.campanello.ownerId == user.id ||
-                      grantedHouseTags.contains(
-                        entry.campanello.campanelloHinooId,
-                      ),
-                )
-                .map((entry) => entry.campanello.id),
-          );
+          _campanelloIndex = targetPage;
+          _lastHouseCampanelloIndex = targetPage;
+          _unlockedCampanelli
+            ..clear()
+            ..addAll(
+              entries
+                  .where(
+                    (entry) =>
+                        entry.campanello.ownerId == user.id ||
+                        grantedHouseTags.contains(
+                          entry.campanello.campanelloHinooId,
+                        ),
+                  )
+                  .map((entry) => entry.campanello.id),
+            );
         });
-        final bool hasOwnEntry = entries.any(
-          (entry) => entry.campanello.ownerId == user.id,
-        );
-        if (hasOwnEntry) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted || !_campanelloPageController.hasClients) return;
-            _campanelloPageController.jumpToPage(0);
-            setState(() {
-              _campanelloIndex = 0;
-              _lastHouseCampanelloIndex = 0;
-            });
-          });
-        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_campanelloPageController.hasClients) return;
+          _campanelloPageController.jumpToPage(targetPage);
+        });
       }
       // Verifica inviti pendenti/accettati per nascondere CTA se già invitato
       try {
@@ -1299,12 +1321,17 @@ class _CampanelliPageState extends State<CampanelliPage>
                           }
                           if (index == 0) {
                             final int target = _lastHouseCampanelloIndex;
-                            if (_campanelloPageController.hasClients) {
-                              _campanelloPageController.jumpToPage(target);
-                            }
                             setState(() {
                               _verticalPageIndex = index;
                               _campanelloIndex = target;
+                            });
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted ||
+                                  _verticalPageIndex != 0 ||
+                                  !_campanelloPageController.hasClients) {
+                                return;
+                              }
+                              _campanelloPageController.jumpToPage(target);
                             });
                             return;
                           }
