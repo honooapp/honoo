@@ -14,7 +14,9 @@ import '../Services/house_shared_content_service.dart';
 import '../UI/hinoo_viewer.dart';
 import '../UI/honoo_card.dart';
 import '../UI/unified_thread_view.dart';
-import '../Utility/honoo_colors.dart';
+import '../Utility/chest_content_style.dart';
+import '../Services/supabase_provider.dart';
+import 'home_page.dart';
 import '../Widgets/honoo_app_title.dart';
 import '../Widgets/loading_spinner.dart';
 
@@ -40,6 +42,20 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
   bool _loading = true;
   Object? _error;
   int _index = 0;
+  ConversationEntry? _selectedEntry;
+
+  ChestContentStyle get _style {
+    final viewerId = SupabaseProvider.client.auth.currentUser?.id;
+    if (_selectedEntry != null) {
+      return ChestContentStyle.forConversationEntry(
+        _selectedEntry!,
+        viewerUserId: viewerId,
+      );
+    }
+    return _items.isEmpty
+        ? ChestContentStyle.own
+        : ChestContentStyle.forItem(_items[_index], viewerUserId: viewerId);
+  }
 
   @override
   void initState() {
@@ -73,7 +89,7 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: HonooColor.background,
+      backgroundColor: _style.backgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -82,16 +98,18 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  const SizedBox(
+                  SizedBox(
                     width: double.infinity,
                     height: 48,
-                    child: Center(child: HonooAppTitle()),
+                    child: Center(
+                      child: HonooAppTitle(color: _style.logoColor),
+                    ),
                   ),
                   PositionedDirectional(
                     start: 8,
                     child: IconButton(
                       tooltip: 'Indietro',
-                      color: Colors.white,
+                      color: _style.foregroundColor,
                       icon: const Icon(Icons.arrow_back),
                       onPressed: () => Navigator.of(context).maybePop(),
                     ),
@@ -100,25 +118,66 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
               ),
             ),
             Expanded(child: _body()),
-            if (!_loading && _error == null && _items.isNotEmpty)
-              ResponsiveFooterBar(
-                useSafeArea: false,
-                actions: [
+            ResponsiveFooterBar(
+              useSafeArea: false,
+              actions: [
+                ResponsiveFooterAction(
+                  asset: 'assets/icons/home.svg',
+                  size: 32,
+                  tooltip: 'Home',
+                  colorFilter: ColorFilter.mode(
+                    _style.foregroundColor,
+                    BlendMode.srcIn,
+                  ),
+                  onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const HomePage()),
+                    (route) => false,
+                  ),
+                ),
+                ResponsiveFooterAction(
+                  asset: 'assets/icons/info.svg',
+                  size: 32,
+                  tooltip: 'Info',
+                  colorFilter: ColorFilter.mode(
+                    _style.foregroundColor,
+                    BlendMode.srcIn,
+                  ),
+                  onPressed: () => showHonooMessageDialog(
+                    context,
+                    title: 'Scrigno condiviso',
+                    duration: const Duration(seconds: 20),
+                    message:
+                        'Scorri tra gli honoo e gli hinoo condivisi in questa casa. '
+                        'Scorri in verticale per leggere le conversazioni. '
+                        'Premi Rispondi per rispondere al contenuto selezionato.',
+                  ),
+                ),
+                if (!_loading &&
+                    _error == null &&
+                    _items.isNotEmpty &&
+                    _selectedEntry?.kind != ConversationEntryKind.deleted)
                   ResponsiveFooterAction(
                     asset: 'assets/icons/reply.svg',
                     size: 32,
                     tooltip: 'Rispondi',
                     semanticsLabel: 'Rispondi',
+                    colorFilter: ColorFilter.mode(
+                      _style.foregroundColor,
+                      BlendMode.srcIn,
+                    ),
                     onPressed: _reply,
                   ),
-                ],
-              ),
+              ],
+            ),
             if (_items.length > 1)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Text(
                   '${_index + 1} / ${_items.length}',
-                  style: GoogleFonts.arvo(color: Colors.white70, fontSize: 13),
+                  style: GoogleFonts.arvo(
+                    color: _style.foregroundColor,
+                    fontSize: 13,
+                  ),
                 ),
               ),
           ],
@@ -129,7 +188,7 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
 
   Widget _body() {
     if (_loading) {
-      return const Center(child: LoadingSpinner(color: Colors.white));
+      return Center(child: LoadingSpinner(color: _style.foregroundColor));
     }
     if (_error != null) {
       return _message('Non riesco ad aprire lo scrigno. Riprova.');
@@ -142,7 +201,10 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
         key: const ValueKey('shared-house-content'),
         controller: _pageController,
         itemCount: _items.length,
-        onPageChanged: (value) => setState(() => _index = value),
+        onPageChanged: (value) => setState(() {
+          _index = value;
+          _selectedEntry = null;
+        }),
         itemBuilder: (context, index) {
           final item = _items[index];
           final conversationId = item.when(
@@ -163,6 +225,13 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
               maxHeight: constraints.maxHeight,
               isActive: index == _index,
               conversationLoader: widget.conversationLoader,
+              onSelect: (entry) {
+                if (mounted &&
+                    index == _index &&
+                    !identical(entry, _selectedEntry)) {
+                  setState(() => _selectedEntry = entry);
+                }
+              },
             );
           }
           return item.when(
@@ -179,6 +248,10 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
                 maxWidth: constraints.maxWidth,
                 maxHeight: constraints.maxHeight,
                 authorId: hinoo.ownerId,
+                gapColor: ChestContentStyle.forItem(
+                  item,
+                  viewerUserId: SupabaseProvider.client.auth.currentUser?.id,
+                ).backgroundColor,
               ),
             ),
           );
@@ -190,19 +263,26 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
   Future<void> _reply() async {
     // Capture the selected content before opening the choice dialog.
     final item = _items[_index];
-    final parentId = item.honoo?.dbId ?? item.hinoo?.id;
+    final entry = _selectedEntry;
+    if (entry?.kind == ConversationEntryKind.deleted) return;
+    final parentId = entry?.id ?? item.honoo?.dbId ?? item.hinoo?.id;
     if (parentId == null || parentId.isEmpty) return;
     final choice = await _showReplyChoice();
     if (choice == null || !mounted) return;
     final link = ConversationLink.fromParent(
       parentId: parentId,
       parentConversationId:
+          entry?.honoo?.conversationId ??
+          entry?.hinoo?.conversationId ??
           item.honoo?.conversationId ??
           item.hinoo?.conversationId ??
-          item.hinoo?.draft.conversationId,
-      recipientId: widget.ownerId,
+          item.hinoo?.draft.conversationId ??
+          (item.honoo?.hasReplies == true ? item.honoo?.dbId : null),
+      recipientId: entry?.ownerId ?? widget.ownerId,
     );
-    final targetContentName = item.honoo != null ? 'honoo' : 'hinoo';
+    final targetContentName = entry != null
+        ? (entry.kind == ConversationEntryKind.honoo ? 'honoo' : 'hinoo')
+        : (item.honoo != null ? 'honoo' : 'hinoo');
     await Navigator.of(context).push<Object?>(
       MaterialPageRoute(
         builder: (_) => choice == _ReplyChoice.honoo
@@ -310,7 +390,7 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
       child: Text(
         value,
         textAlign: TextAlign.center,
-        style: GoogleFonts.arvo(color: Colors.white, fontSize: 18),
+        style: GoogleFonts.arvo(color: _style.foregroundColor, fontSize: 18),
       ),
     ),
   );

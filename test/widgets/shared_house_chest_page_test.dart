@@ -4,6 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:honoo/Pages/shared_house_chest_page.dart';
 import 'package:honoo/UI/unified_thread_view.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:honoo/Widgets/responsive_footer_bar.dart';
+import 'package:honoo/Utility/chest_content_style.dart';
+import 'package:honoo/Entities/conversation_entry.dart';
+import 'package:honoo/Entities/hinoo.dart';
 
 import '../test_supabase_helper.dart';
 
@@ -59,6 +63,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      expect(find.byTooltip('Home'), findsOneWidget);
+      expect(find.byTooltip('Info'), findsOneWidget);
       if (kind == 'empty') {
         expect(find.byTooltip('Rispondi'), findsNothing);
       } else {
@@ -69,6 +75,34 @@ void main() {
               .conversationId,
           'thread-id',
         );
+        final thread = tester.widget<UnifiedThreadView>(
+          find.byType(UnifiedThreadView),
+        );
+        thread.onSelect!(
+          ConversationEntry.hinoo(
+            const HinooDraft(pages: []),
+            createdAt: DateTime(2026),
+            ownerId: 'another-author',
+            id: 'selected-reply',
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<Scaffold>(find.byType(Scaffold).first).backgroundColor,
+          ChestContentStyle.receivedReply.backgroundColor,
+        );
+        final footer = tester.widget<ResponsiveFooterBar>(
+          find.byType(ResponsiveFooterBar),
+        );
+        expect(
+          footer.actions
+              .firstWhere((action) => action.tooltip == 'Rispondi')
+              .colorFilter,
+          ColorFilter.mode(
+            ChestContentStyle.receivedReply.foregroundColor,
+            BlendMode.srcIn,
+          ),
+        );
         await tester.tap(find.byTooltip('Rispondi'));
         await tester.pumpAndSettle();
         expect(find.widgetWithText(ElevatedButton, 'honoo'), findsOneWidget);
@@ -76,6 +110,11 @@ void main() {
         await tester.tap(find.text('Annulla'));
         await tester.pumpAndSettle();
         expect(find.byTooltip('Rispondi'), findsOneWidget);
+        thread.onSelect!(
+          ConversationEntry.deleted(id: 'deleted', createdAt: DateTime(2026)),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byTooltip('Rispondi'), findsNothing);
       }
       expect(tester.takeException(), isNull);
     });
