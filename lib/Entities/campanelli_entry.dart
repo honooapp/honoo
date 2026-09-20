@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 class CampanelliEntry {
   const CampanelliEntry({
     required this.hinooId,
+    this.houseText = '',
     required this.ownerId,
     required this.createdAt,
     required this.text,
@@ -18,6 +19,7 @@ class CampanelliEntry {
   });
 
   final String hinooId;
+  final String houseText;
   final String ownerId;
   final DateTime createdAt;
   final String text;

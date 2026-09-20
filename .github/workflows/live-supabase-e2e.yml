@@ -5,6 +5,11 @@ on:
     - cron: '17 3 * * *'
   workflow_dispatch:
     inputs:
+      repair_staging_visibility:
+        description: 'Ripristina le policy partecipanti nello staging prima del test'
+        required: false
+        type: boolean
+        default: false
       run_ui:
         description: 'Esegui anche il flusso UI live su Chrome'
         required: true
@@ -40,6 +45,11 @@ jobs:
           flutter-version: '3.44.6'
       - name: Install dependencies
         run: flutter pub get
+      - name: Repair staging participant visibility (manual only)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.repair_staging_visibility }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 tool/repair_staging_conversation_visibility.py
       - name: Run live conversation checks
         run: bash tool/run_live_conversation_test.sh
 

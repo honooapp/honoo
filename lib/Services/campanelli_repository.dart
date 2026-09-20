@@ -27,7 +27,7 @@ class CampanelliDataRepository {
       () => _client
           .from('case')
           .select(
-            'campanello_hinoo_id,owner_id,house_image_url,bg_transform,created_at',
+            'campanello_hinoo_id,owner_id,house_image_url,house_text,bg_transform,created_at',
           ),
     );
     return _asList(rows);

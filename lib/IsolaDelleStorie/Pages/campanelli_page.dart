@@ -31,6 +31,7 @@ import 'package:honoo/Widgets/desktop_carousel_arrows.dart';
 import 'package:honoo/Widgets/busy_overlay.dart';
 import 'package:honoo/Services/campanelli_repository.dart';
 import 'package:honoo/Services/house_invite_prompt_controller.dart';
+import 'package:honoo/Services/house_invite_service.dart';
 
 import '../../Pages/home_page.dart';
 import '../../Pages/email_login_page.dart';
@@ -407,12 +408,23 @@ class _CampanelliPageState extends State<CampanelliPage>
       await Navigator.of(context).push<void>(
         MaterialPageRoute(builder: (_) => ChestPage(casaFilter: filter)),
       );
+      if (mounted) await _returnToDoorbell();
       return;
     }
     final ownerId = campanello.ownerId;
     if (ownerId == null || ownerId.isEmpty) return;
     await Navigator.of(context).push<void>(
       MaterialPageRoute(builder: (_) => SharedHouseChestPage(ownerId: ownerId)),
+    );
+    if (mounted) await _returnToDoorbell();
+  }
+
+  Future<void> _returnToDoorbell() async {
+    if (!_pageController.hasClients) return;
+    await _pageController.animateToPage(
+      0,
+      duration: _kHouseSlideDuration,
+      curve: _kCurve,
     );
   }
 
@@ -493,6 +505,53 @@ class _CampanelliPageState extends State<CampanelliPage>
     await WidgetsBinding.instance.endOfFrame;
     if (_campanelloPageController.hasClients) {
       _campanelloPageController.jumpToPage(pageIndex);
+    }
+  }
+
+  Future<void> _editCasaText(_CampanelloEntry entry) async {
+    final id = entry.campanello.campanelloHinooId;
+    if (id == null) return;
+    final controller = TextEditingController(text: entry.casa.text);
+    final route = DialogRoute<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Modifica testo della casa'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          minLines: 3,
+          maxLines: 8,
+          maxLength: 600,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annulla'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Salva'),
+          ),
+        ],
+      ),
+    );
+    final text = await Navigator.of(context, rootNavigator: true).push(route);
+    await route.completed;
+    controller.dispose();
+    if (text == null || !mounted) return;
+    try {
+      await HouseInviteService().updateHouseText(
+        campanelloHinooId: id,
+        text: text,
+      );
+      if (mounted) await _loadUserEntries();
+    } catch (_) {
+      if (mounted) {
+        showHonooToast(
+          context,
+          message: 'Impossibile salvare il testo. Riprova.',
+        );
+      }
     }
   }
 
@@ -702,7 +761,11 @@ class _CampanelliPageState extends State<CampanelliPage>
                 bgTransform: entry.campanelloBgTransform,
               ),
               casa: CasaData.fromBackend(
-                row: {'id': casaId, 'bg_transform': entry.bgTransform},
+                row: {
+                  'id': casaId,
+                  'bg_transform': entry.bgTransform,
+                  'house_text': entry.houseText,
+                },
                 backgroundImage: _houseBackgroundProvider(
                   entry.houseImageUrl,
                   entry.campanelloBackgroundUrl,
@@ -840,7 +903,11 @@ class _CampanelliPageState extends State<CampanelliPage>
               bgTransform: slide.bgTransform,
             ),
             casa: CasaData.fromBackend(
-              row: {'id': casaId, 'bg_transform': row['house_bg_transform']},
+              row: {
+                'id': casaId,
+                'bg_transform': row['house_bg_transform'],
+                'house_text': row['house_text'],
+              },
               backgroundImage: _houseBackgroundProvider(
                 houseImageUrl,
                 slide.backgroundImage,
@@ -1460,6 +1527,9 @@ class _CampanelliPageState extends State<CampanelliPage>
                                 footerBottomSpacing: footerBottomSpacing,
                                 width: casaWidth,
                                 height: casaHeight,
+                                onEditTextTap: isOwnCampanello
+                                    ? () => _editCasaText(houseEntry)
+                                    : null,
                                 onEditTap: isOwnCampanello
                                     ? () => _editCasa(houseEntry)
                                     : null,
@@ -1478,6 +1548,9 @@ class _CampanelliPageState extends State<CampanelliPage>
                                 footerBottomSpacing: footerBottomSpacing,
                                 width: casaWidth,
                                 height: casaHeight,
+                                onEditTextTap: isOwnCampanello
+                                    ? () => _editCasaText(houseEntry)
+                                    : null,
                                 onEditTap: isOwnCampanello
                                     ? () => _editCasa(houseEntry)
                                     : null,

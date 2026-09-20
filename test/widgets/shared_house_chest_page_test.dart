@@ -64,11 +64,14 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byTooltip('Home'), findsOneWidget);
+      expect(find.byTooltip('Torna al campanello'), findsOneWidget);
       expect(find.byTooltip('Info'), findsOneWidget);
       if (kind == 'empty') {
         expect(find.byTooltip('Rispondi'), findsNothing);
       } else {
         expect(find.byType(UnifiedThreadView), findsOneWidget);
+        expect(find.text('Conversazione vuota'), findsNothing);
+        expect(find.text('Test'), findsWidgets);
         expect(
           tester
               .widget<UnifiedThreadView>(find.byType(UnifiedThreadView))

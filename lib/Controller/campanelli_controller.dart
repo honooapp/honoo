@@ -76,11 +76,11 @@ class CampanelliController extends ChangeNotifier {
     HouseInviteService? houseInviteService,
     AdminService? adminService,
     SupabaseClient? client,
-  })  : _repository = repository ?? CampanelliDataRepository(),
-        _configuredRealtimeGateway = realtimeGateway,
-        _configuredHouseInviteService = houseInviteService,
-        _configuredAdminService = adminService,
-        _configuredClient = client;
+  }) : _repository = repository ?? CampanelliDataRepository(),
+       _configuredRealtimeGateway = realtimeGateway,
+       _configuredHouseInviteService = houseInviteService,
+       _configuredAdminService = adminService,
+       _configuredClient = client;
 
   final CampanelliDataRepository _repository;
   final CampanelliRealtimeGateway? _configuredRealtimeGateway;
@@ -149,22 +149,25 @@ class CampanelliController extends ChangeNotifier {
         final text = slide.text.trim();
         if (text.isEmpty) continue;
         final houseRow = houseByHinooId[id] ?? const <String, dynamic>{};
-        entries.add(CampanelliEntry(
-          hinooId: id,
-          ownerId: ownerId,
-          createdAt:
-              DateTime.tryParse(houseRow['created_at']?.toString() ?? '') ??
-              DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
-          text: text,
-          campanelloBackgroundUrl: slide.backgroundImage,
-          houseImageUrl: houseRow['house_image_url']?.toString(),
-          bgTransform: _parseTransform(houseRow['bg_transform']),
-          bgScale: slide.bgScale,
-          bgOffsetX: slide.bgOffsetX,
-          bgOffsetY: slide.bgOffsetY,
-          campanelloIsTextWhite: slide.isTextWhite,
-          campanelloBgTransform: slide.bgTransform,
-        ));
+        entries.add(
+          CampanelliEntry(
+            hinooId: id,
+            ownerId: ownerId,
+            createdAt:
+                DateTime.tryParse(houseRow['created_at']?.toString() ?? '') ??
+                DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+            text: text,
+            campanelloBackgroundUrl: slide.backgroundImage,
+            houseText: houseRow['house_text']?.toString() ?? '',
+            houseImageUrl: houseRow['house_image_url']?.toString(),
+            bgTransform: _parseTransform(houseRow['bg_transform']),
+            bgScale: slide.bgScale,
+            bgOffsetX: slide.bgOffsetX,
+            bgOffsetY: slide.bgOffsetY,
+            campanelloIsTextWhite: slide.isTextWhite,
+            campanelloBgTransform: slide.bgTransform,
+          ),
+        );
       }
       entries.sort((a, b) {
         final aIsOwned = a.ownerId == userId;
@@ -173,15 +176,17 @@ class CampanelliController extends ChangeNotifier {
         final byCreation = a.createdAt.compareTo(b.createdAt);
         return byCreation != 0 ? byCreation : a.hinooId.compareTo(b.hinooId);
       });
-      _publish(CampanelliLoadState(
-        entries: List<CampanelliEntry>.unmodifiable(entries),
-        shareModesByCampanello: shareModes,
-        ownedHinooIds: List<String>.unmodifiable(ownedHinooIds),
-        pendingKnocks: _state.pendingKnocks,
-        hasOwnHouse: ownedHinooIds.isNotEmpty,
-        hasPendingOrAcceptedInvite: _state.hasPendingOrAcceptedInvite,
-        isInviteRequestBusy: _state.isInviteRequestBusy,
-      ));
+      _publish(
+        CampanelliLoadState(
+          entries: List<CampanelliEntry>.unmodifiable(entries),
+          shareModesByCampanello: shareModes,
+          ownedHinooIds: List<String>.unmodifiable(ownedHinooIds),
+          pendingKnocks: _state.pendingKnocks,
+          hasOwnHouse: ownedHinooIds.isNotEmpty,
+          hasPendingOrAcceptedInvite: _state.hasPendingOrAcceptedInvite,
+          isInviteRequestBusy: _state.isInviteRequestBusy,
+        ),
+      );
     } catch (error) {
       _publish(CampanelliLoadState(error: error));
     }
@@ -279,15 +284,19 @@ class CampanelliController extends ChangeNotifier {
       else
         campanelloHinooId: Set<CasaShareMode>.unmodifiable(parsed),
     };
-    _publish(_state.copyWith(
-      shareModesByCampanello:
-          Map<String, Set<CasaShareMode>>.unmodifiable(updated),
-    ));
+    _publish(
+      _state.copyWith(
+        shareModesByCampanello: Map<String, Set<CasaShareMode>>.unmodifiable(
+          updated,
+        ),
+      ),
+    );
   }
 
   Future<bool> refreshHouseInviteState(String userId) async {
-    final hasInvite =
-        await _houseInviteService.hasPendingOrAcceptedInvite(userId);
+    final hasInvite = await _houseInviteService.hasPendingOrAcceptedInvite(
+      userId,
+    );
     _publish(_state.copyWith(hasPendingOrAcceptedInvite: hasInvite));
     return hasInvite;
   }
@@ -441,8 +450,10 @@ class CampanelliController extends ChangeNotifier {
       onChanged();
       return true;
     } catch (error, stackTrace) {
-      debugPrint('[CampanelliController] pending knock refresh failed: '
-          '${AppFailure.from(error, stackTrace)}');
+      debugPrint(
+        '[CampanelliController] pending knock refresh failed: '
+        '${AppFailure.from(error, stackTrace)}',
+      );
       return false;
     } finally {
       _isRefreshingPendingKnocks = false;
@@ -472,8 +483,8 @@ class CampanelliController extends ChangeNotifier {
   }
 
   Set<String> get pendingKnockTags => Set<String>.unmodifiable(
-        _state.pendingKnocks.map((knock) => knock.targetTag),
-      );
+    _state.pendingKnocks.map((knock) => knock.targetTag),
+  );
 
   void startOwnerRealtime({
     required String userId,
@@ -504,9 +515,7 @@ class CampanelliController extends ChangeNotifier {
     );
   }
 
-  void startVisitorRealtime({
-    required String userId,
-  }) {
+  void startVisitorRealtime({required String userId}) {
     _visitorSubscription?.close();
     _visitorSubscription = _realtimeGateway.subscribeVisitor(
       userId: userId,
@@ -538,9 +547,9 @@ class CampanelliController extends ChangeNotifier {
   }
 
   void _replacePendingKnocks(Iterable<PendingKnock> knocks) {
-    _publish(_state.copyWith(
-      pendingKnocks: List<PendingKnock>.unmodifiable(knocks),
-    ));
+    _publish(
+      _state.copyWith(pendingKnocks: List<PendingKnock>.unmodifiable(knocks)),
+    );
   }
 
   static List<double>? _parseTransform(dynamic raw) {
@@ -550,8 +559,10 @@ class CampanelliController extends ChangeNotifier {
         raw.map((value) => (value as num).toDouble()),
       );
     } catch (error, stackTrace) {
-      debugPrint('[CampanelliController] invalid transform: '
-          '${AppFailure.from(error, stackTrace)}');
+      debugPrint(
+        '[CampanelliController] invalid transform: '
+        '${AppFailure.from(error, stackTrace)}',
+      );
       return null;
     }
   }

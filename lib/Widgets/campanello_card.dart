@@ -10,6 +10,7 @@ import '../Utility/honoo_link_style.dart';
 import '../Utility/inline_text_formatting.dart';
 import 'cover_transform_image.dart';
 import 'text_box_download_button.dart';
+import '../Utility/download_capture.dart';
 
 class CampanelloCard extends StatelessWidget {
   const CampanelloCard({
@@ -95,43 +96,59 @@ class CampanelloCard extends StatelessWidget {
       transform = Matrix4.fromList(values);
     }
 
-    return SizedBox(
-      width: width,
-      height: height,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (transform != null)
-            CoverTransformImage.transformed(
-              image: data.campanello!.backgroundImage,
-              transform: transform,
-            )
-          else
-            Image(image: data.campanello!.backgroundImage, fit: BoxFit.cover),
-          savedText,
-          if (onEditTap != null || onEditImageTap != null)
+    final repaintKey = GlobalKey();
+    return RepaintBoundary(
+      key: repaintKey,
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (transform != null)
+              CoverTransformImage.transformed(
+                image: data.campanello!.backgroundImage,
+                transform: transform,
+              )
+            else
+              Image(image: data.campanello!.backgroundImage, fit: BoxFit.cover),
+            savedText,
             Positioned(
-              top: 6,
-              left: 6,
+              bottom: 8,
+              right: 8,
               child: TextBoxDownloadButton(
-                key: const ValueKey('edit-own-campanello-image'),
-                onPressed: onEditImageTap ?? onEditTap!,
-                tooltip: 'Modifica immagine',
-                asset: 'assets/icons/immagine.svg',
+                tooltip: 'Scarica campanello',
+                onPressed: () => captureAndSave(
+                  context,
+                  repaintKey: repaintKey,
+                  baseName: 'campanello',
+                ),
               ),
             ),
-          if (onEditTextTap != null || onEditTap != null)
-            Positioned(
-              top: 6,
-              right: 6,
-              child: TextBoxDownloadButton(
-                key: const ValueKey('edit-own-campanello-text'),
-                onPressed: onEditTextTap ?? onEditTap!,
-                tooltip: 'Modifica testo',
-                asset: 'assets/icons/modifica testo.svg',
+            if (onEditTap != null || onEditImageTap != null)
+              Positioned(
+                top: 6,
+                left: 6,
+                child: TextBoxDownloadButton(
+                  key: const ValueKey('edit-own-campanello-image'),
+                  onPressed: onEditImageTap ?? onEditTap!,
+                  tooltip: 'Modifica immagine',
+                  asset: 'assets/icons/immagine.svg',
+                ),
               ),
-            ),
-        ],
+            if (onEditTextTap != null || onEditTap != null)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: TextBoxDownloadButton(
+                  key: const ValueKey('edit-own-campanello-text'),
+                  onPressed: onEditTextTap ?? onEditTap!,
+                  tooltip: 'Modifica testo',
+                  asset: 'assets/icons/modifica testo.svg',
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

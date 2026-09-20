@@ -40,6 +40,7 @@ class CampanelloData {
 
 class CasaData {
   const CasaData({
+    this.text = '',
     required this.id,
     required this.backgroundImage,
     this.bgTransform,
@@ -51,6 +52,7 @@ class CasaData {
   final String id;
   final ImageProvider backgroundImage;
   final List<double>? bgTransform;
+  final String text;
   final double bgScale;
   final double bgOffsetX;
   final double bgOffsetY;
@@ -63,6 +65,7 @@ class CasaData {
     required double bgOffsetY,
   }) {
     return CasaData(
+      text: row['house_text']?.toString() ?? '',
       id: row['id']?.toString() ?? '',
       backgroundImage: backgroundImage,
       bgTransform: _parseTransform(row['bg_transform']),

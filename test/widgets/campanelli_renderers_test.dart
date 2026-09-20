@@ -1,17 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:honoo/Entities/campanelli_view_data.dart';
 import 'package:honoo/UI/hinoo_typography.dart';
 import 'package:honoo/Widgets/campanello_card.dart';
 import 'package:honoo/Widgets/casa_section.dart';
+import 'package:honoo/Widgets/cover_transform_image.dart';
 
 void main() {
+  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
   const casa = CasaData(
     id: 'casa-1',
+    text: 'Benvenuti nella mia casa',
     backgroundImage: AssetImage('assets/images/casa_palombaro.png'),
     bgScale: 1,
     bgOffsetX: 0,
     bgOffsetY: 0,
+  );
+
+  testWidgets(
+    'house exposes separate editors and download, and renders its text',
+    (tester) async {
+      var imageEdits = 0;
+      var textEdits = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CasaSection(
+              casa: casa,
+              isUnlocked: true,
+              scrignoAsset: 'assets/icons/scrigno_di_carta.png',
+              footerIconSize: 32,
+              scrignoSize: 96,
+              footerBottomSpacing: 40,
+              width: 320,
+              height: 500,
+              onEditTap: () => imageEdits++,
+              onEditTextTap: () => textEdits++,
+            ),
+          ),
+        ),
+      );
+      expect(find.text('Benvenuti nella mia casa'), findsOneWidget);
+      expect(find.byTooltip('Scarica casa'), findsOneWidget);
+      await tester.tap(find.byTooltip('Modifica casa'));
+      await tester.tap(find.byTooltip('Modifica testo'));
+      expect(imageEdits, 1);
+      expect(textEdits, 1);
+      expect(tester.takeException(), isNull);
+    },
   );
 
   testWidgets('campanello introduttivo conserva il collegamento clicca qui', (
@@ -223,7 +260,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    tester.widget<GestureDetector>(find.byType(GestureDetector)).onTap!();
+    await tester.tap(find.byKey(const ValueKey('house-chest')));
     expect(opened, isTrue);
   });
 
@@ -250,7 +287,9 @@ void main() {
     expect(find.text('Casa chiusa'), findsNothing);
     expect(
       find.byWidgetPredicate(
-        (widget) => widget is Image && widget.image == casa.backgroundImage,
+        (widget) =>
+            widget is CoverTransformImage &&
+            widget.image == casa.backgroundImage,
       ),
       findsOneWidget,
     );

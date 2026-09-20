@@ -77,7 +77,7 @@ void main() {
     verify(() => harness.client.from('case')).called(1);
     verify(
       () => houses.select(
-        'campanello_hinoo_id,owner_id,house_image_url,bg_transform,created_at',
+        'campanello_hinoo_id,owner_id,house_image_url,house_text,bg_transform,created_at',
       ),
     ).called(1);
   });

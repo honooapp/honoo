@@ -16,6 +16,7 @@ import '../UI/honoo_card.dart';
 import '../UI/unified_thread_view.dart';
 import '../Utility/chest_content_style.dart';
 import '../Services/supabase_provider.dart';
+import '../Services/conversation_service.dart';
 import 'home_page.dart';
 import '../Widgets/honoo_app_title.dart';
 import '../Widgets/loading_spinner.dart';
@@ -108,7 +109,7 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
                   PositionedDirectional(
                     start: 8,
                     child: IconButton(
-                      tooltip: 'Indietro',
+                      tooltip: 'Torna al campanello',
                       color: _style.foregroundColor,
                       icon: const Icon(Icons.arrow_back),
                       onPressed: () => Navigator.of(context).maybePop(),
@@ -224,7 +225,23 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
               maxWidth: constraints.maxWidth,
               maxHeight: constraints.maxHeight,
               isActive: index == _index,
-              conversationLoader: widget.conversationLoader,
+              conversationLoader: (id) async {
+                final entries =
+                    await (widget.conversationLoader ??
+                        ConversationService.fetchConversation)(id);
+                final root = item.when(
+                  honoo: ConversationEntry.honoo,
+                  hinoo: (h) => ConversationEntry.hinoo(
+                    h.draft,
+                    id: h.id,
+                    ownerId: h.ownerId,
+                    createdAt: h.createdAt,
+                    isFromMoonSaved: h.isFromMoonSaved,
+                  ),
+                );
+                if (entries.any((entry) => entry.id == root.id)) return entries;
+                return [root, ...entries];
+              },
               onSelect: (entry) {
                 if (mounted &&
                     index == _index &&

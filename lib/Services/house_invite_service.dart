@@ -142,6 +142,18 @@ class HouseInviteService {
     );
   }
 
+  Future<void> updateHouseText({
+    required String campanelloHinooId,
+    required String text,
+  }) async {
+    await _request(
+      () => _client
+          .from('case')
+          .update({'house_text': text})
+          .eq('campanello_hinoo_id', campanelloHinooId),
+    );
+  }
+
   Future<void> updateHouse({
     required String campanelloHinooId,
     required String houseImageUrl,

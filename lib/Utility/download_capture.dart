@@ -25,7 +25,9 @@ Future<void> captureAndSave(
     if (!rootNav.mounted) return;
     await showDownloadSaveResult(
       context: rootNav.context,
-      contentName: baseName.toLowerCase().startsWith('hinoo')
+      contentName: ['casa', 'campanello'].contains(baseName)
+          ? baseName
+          : baseName.toLowerCase().startsWith('hinoo')
           ? 'hinoo'
           : 'honoo',
       result: result,
