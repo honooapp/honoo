@@ -24,9 +24,10 @@ class TextBoxDownloadButton extends StatelessWidget {
     _captureDepth += 1;
     if (_captureDepth == 1) {
       _hiddenForCapture.value = true;
-      await WidgetsBinding.instance.endOfFrame;
     }
     try {
+      // Every overlapping capture must wait for the hidden controls to paint.
+      await WidgetsBinding.instance.endOfFrame;
       return await capture();
     } finally {
       _captureDepth -= 1;

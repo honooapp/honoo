@@ -43,4 +43,30 @@ void main() {
     expect(tester.widget<Visibility>(find.byType(Visibility)).visible, isTrue);
     expect(find.byType(SvgPicture), findsOneWidget);
   });
+  testWidgets('due catture attendono entrambe che i pulsanti siano nascosti', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(home: TextBoxDownloadButton(onPressed: () {})),
+    );
+    final visibilityElement = find.byType(Visibility).evaluate().single;
+    final visibleDuringCapture = <bool>[];
+    final finish = Completer<void>();
+    Future<void> capture() async {
+      visibleDuringCapture.add(
+        (visibilityElement.widget as Visibility).visible,
+      );
+      await finish.future;
+    }
+
+    final first = TextBoxDownloadButton.hideWhileCapturing(capture);
+    final second = TextBoxDownloadButton.hideWhileCapturing(capture);
+    final both = Future.wait([first, second]);
+    await tester.pump();
+    finish.complete();
+    await both;
+    expect(visibleDuringCapture, [false, false]);
+    await tester.pump();
+    expect(tester.widget<Visibility>(find.byType(Visibility)).visible, isTrue);
+  });
 }

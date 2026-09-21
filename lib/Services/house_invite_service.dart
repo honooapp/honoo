@@ -131,27 +131,35 @@ class HouseInviteService {
     required String campanelloHinooId,
     required HinooDraft campanello,
   }) async {
-    await _request(
+    final rows = await _request(
       () => _client
           .from('hinoo')
           .update({
             'pages': campanello.pages.map((page) => page.toJson()).toList(),
             'updated_at': DateTime.now().toIso8601String(),
           })
-          .eq('id', campanelloHinooId),
+          .eq('id', campanelloHinooId)
+          .select('id'),
     );
+    if (rows.length != 1) {
+      throw StateError('Modifica non salvata: contenuto non disponibile.');
+    }
   }
 
   Future<void> updateHouseText({
     required String campanelloHinooId,
     required String text,
   }) async {
-    await _request(
+    final rows = await _request(
       () => _client
           .from('case')
           .update({'house_text': text})
-          .eq('campanello_hinoo_id', campanelloHinooId),
+          .eq('campanello_hinoo_id', campanelloHinooId)
+          .select('id'),
     );
+    if (rows.length != 1) {
+      throw StateError('Modifica non salvata: contenuto non disponibile.');
+    }
   }
 
   Future<void> updateHouse({
@@ -159,14 +167,18 @@ class HouseInviteService {
     required String houseImageUrl,
     required List<double> bgTransform,
   }) async {
-    await _request(
+    final rows = await _request(
       () => _client
           .from('case')
           .update({
             'house_image_url': houseImageUrl,
             'bg_transform': bgTransform,
           })
-          .eq('campanello_hinoo_id', campanelloHinooId),
+          .eq('campanello_hinoo_id', campanelloHinooId)
+          .select('id'),
     );
+    if (rows.length != 1) {
+      throw StateError('Modifica non salvata: contenuto non disponibile.');
+    }
   }
 }
