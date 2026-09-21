@@ -65,6 +65,10 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
   }
 
   Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final items = await _service.fetch(widget.ownerId);
       if (!mounted) return;
@@ -192,7 +196,22 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
       return Center(child: LoadingSpinner(color: _style.foregroundColor));
     }
     if (_error != null) {
-      return _message('Non riesco ad aprire lo scrigno. Riprova.');
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _message('Non riesco ad aprire lo scrigno. Riprova.'),
+            TextButton.icon(
+              onPressed: _load,
+              style: TextButton.styleFrom(
+                foregroundColor: _style.foregroundColor,
+              ),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Riprova'),
+            ),
+          ],
+        ),
+      );
     }
     if (_items.isEmpty) {
       return _message('Non ci sono ancora contenuti da mostrare.');

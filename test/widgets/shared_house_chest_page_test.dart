@@ -17,6 +17,60 @@ void main() {
     GoogleFonts.config.allowRuntimeFetching = false;
   });
 
+  for (final failures in [1, 2]) {
+    testWidgets('shared chest recovers after $failures failed loads', (
+      tester,
+    ) async {
+      final harness = SupabaseTestHarness(withAuthenticatedUser: true)
+        ..enableOverrides();
+      addTearDown(harness.disableOverrides);
+      var attempts = 0;
+      final rpc = MockQueryChain()
+        ..queueResponse([
+          {
+            'kind': 'honoo',
+            'data': {
+              'id': 'recovered-content',
+              'user_id': 'owner-id',
+              'text': 'Contenuto recuperato',
+              'image_url': '',
+              'destination': 'chest',
+              'type': 'personal',
+              'created_at': '2026-08-10T10:00:00Z',
+            },
+          },
+        ]);
+      when(
+        () => harness.client.rpc(
+          'get_shared_house_chest',
+          params: any(named: 'params'),
+        ),
+      ).thenAnswer((_) {
+        attempts++;
+        if (attempts <= failures) throw StateError('Network unavailable');
+        return rpc;
+      });
+      await tester.pumpWidget(
+        const MaterialApp(home: SharedHouseChestPage(ownerId: 'owner-id')),
+      );
+      await tester.pumpAndSettle();
+      for (var failure = 0; failure < failures; failure++) {
+        expect(
+          find.text('Non riesco ad aprire lo scrigno. Riprova.'),
+          findsOneWidget,
+        );
+        expect(find.byTooltip('Rispondi'), findsNothing);
+        await tester.tap(find.widgetWithText(TextButton, 'Riprova'));
+        await tester.pumpAndSettle();
+      }
+      expect(attempts, failures + 1);
+      expect(find.text('Contenuto recuperato'), findsWidgets);
+      expect(find.byTooltip('Rispondi'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'Riprova'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final kind in ['honoo', 'hinoo', 'empty']) {
     testWidgets('shared $kind exposes reply choice only with content', (
       tester,
