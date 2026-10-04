@@ -151,7 +151,12 @@ class HonooController {
     try {
       final result = await HonooService.duplicateToChest(h);
       if (result == DuplicationResult.inserted) {
-        await loadChest();
+        try {
+          await loadChest();
+        } catch (error) {
+          // The insert has already succeeded; a cache refresh cannot undo it.
+          debugPrint('Saved honoo, but chest refresh failed: $error');
+        }
       }
       return result;
     } catch (e) {

@@ -88,6 +88,7 @@ class _MoonPageState extends State<MoonPage> {
   Future<void> _loadMoonContent() async {
     try {
       final rows = await _contentFeedService.fetchMoonRows();
+      if (!mounted) return;
 
       final List<_MoonItem> items = [];
 
@@ -155,6 +156,7 @@ class _MoonPageState extends State<MoonPage> {
       });
       _prefetchFrom(_currentIndex);
     } catch (e, stackTrace) {
+      if (!mounted) return;
       AppLogger.error(
         'Caricamento Luna non riuscito',
         scope: 'MoonPage',
@@ -391,6 +393,7 @@ class _MoonPageState extends State<MoonPage> {
                     carouselController: _carouselController,
                     itemCount: _items.length,
                     options: cs.CarouselOptions(
+                      initialPage: _currentIndex,
                       height: bodyHeight,
                       viewportFraction: 1.0,
                       enableInfiniteScroll: false,

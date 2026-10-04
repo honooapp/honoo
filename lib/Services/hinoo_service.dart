@@ -199,7 +199,14 @@ class HinooService {
 
   static Future<void> deleteHinooById(String id) async {
     if (id.trim().isEmpty) return;
-    await _reliability.write(() => _client.from(_table).delete().eq('id', id));
+    final rows = await _reliability.write<List<dynamic>>(
+      () async => await _client.from(_table).delete().eq('id', id).select('id'),
+    );
+    if (rows.length != 1) {
+      throw StateError(
+        'Eliminazione non confermata: contenuto non disponibile.',
+      );
+    }
   }
 
   static String fingerprint(HinooDraft d) {

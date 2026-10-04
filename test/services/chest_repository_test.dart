@@ -132,7 +132,9 @@ void main() {
   });
 
   test('deleteHinoo elimina esclusivamente la riga indicata', () async {
-    hinoo.queueResponse(<String, dynamic>{});
+    hinoo.queueResponse([
+      {'id': 'h-1'},
+    ]);
 
     await repository.deleteHinoo('h-1');
 

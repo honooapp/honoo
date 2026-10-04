@@ -132,7 +132,9 @@ void main() {
   );
 
   test('deleteHonooById: chiama delete().eq("id", id) e completa', () async {
-    chain.queueResponse(<String, dynamic>{});
+    chain.queueResponse([
+      {'id': '123'},
+    ]);
 
     await HonooService.deleteHonooById('123');
 

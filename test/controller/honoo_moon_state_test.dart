@@ -1,6 +1,8 @@
 import 'package:mocktail/mocktail.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:honoo/Controller/honoo_controller.dart';
+import 'package:honoo/Entities/honoo.dart';
+import 'package:honoo/Services/duplication_result.dart';
 
 import '../test_supabase_helper.dart';
 
@@ -17,6 +19,37 @@ void main() {
   });
 
   tearDown(() => harness.disableOverrides());
+
+  test('successful save remains successful when cache refresh fails', () async {
+    final chain = harness.stubTable('honoo');
+    chain.queueResponse([]);
+    when(
+      () => harness.client.from('chest_hidden_conversations'),
+    ).thenThrow(StateError('refresh unavailable'));
+    final controller = HonooController();
+    addTearDown(controller.clearCache);
+    final honoo = Honoo.fromMap({
+      'id': 'moon-id',
+      'text': 'Salvato',
+      'image_url': '',
+      'user_id': 'author',
+      'destination': 'moon',
+    });
+    expect(await controller.saveToChest(honoo), DuplicationResult.inserted);
+    verify(() => chain.insert(any())).called(1);
+    expect(controller.isLoading.value, isFalse);
+  });
+
+  test('failed insert still reports failure', () async {
+    final chain = harness.stubTable('honoo');
+    when(() => chain.insert(any())).thenThrow(StateError('insert failed'));
+    final honoo = Honoo.fromMap({
+      'id': 'moon-id',
+      'text': 'Test',
+      'image_url': '',
+    });
+    await expectLater(HonooController().saveToChest(honoo), throwsA(anything));
+  });
 
   test('loadChest marca un honoo con la stessa copia già sulla Luna', () async {
     final hiddenConversations = harness.stubTable('chest_hidden_conversations');

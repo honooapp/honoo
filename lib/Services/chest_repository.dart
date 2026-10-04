@@ -134,9 +134,15 @@ class ChestRepository {
   }
 
   Future<void> deleteHinoo(String id) async {
-    await _reliability.write(
-      () async => await _client.from('hinoo').delete().eq('id', id),
+    final rows = await _reliability.write<List<dynamic>>(
+      () async =>
+          await _client.from('hinoo').delete().eq('id', id).select('id'),
     );
+    if (rows.length != 1) {
+      throw StateError(
+        'Eliminazione non confermata: contenuto non disponibile.',
+      );
+    }
   }
 
   static List<dynamic> _asList(dynamic rows) {
