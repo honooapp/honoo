@@ -179,6 +179,57 @@ void main() {
     }
   });
 
+  for (final explicitConfirmation in [false, true]) {
+    testWidgets(
+      'image first allows direct text entry (confirmation: $explicitConfirmation)',
+      (tester) async {
+        final key = GlobalKey<HonooBuilderState>();
+        String latestText = '';
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 360,
+                  height: 549,
+                  child: HonooBuilder(
+                    key: key,
+                    requireExplicitConfirmation: explicitConfirmation,
+                    onHonooChanged: (text, _) => latestText = text,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        key.currentState!.setImageBytesForTesting(
+          base64Decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+          ),
+        );
+        await tester.pumpAndSettle();
+        final field = find.byType(TextField);
+        await tester.tap(field);
+        await tester.pump();
+        expect(tester.widget<TextField>(field).readOnly, isFalse);
+        expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+        await tester.enterText(field, 'Prima immagine, poi testo');
+        expect(latestText, 'Prima immagine, poi testo');
+        await tester.tap(find.byKey(const Key('honoo-image-area')));
+        await tester.pump();
+        expect(tester.widget<TextField>(field).focusNode!.hasFocus, isFalse);
+        await tester.tap(field);
+        await tester.enterText(field, 'Testo aggiornato');
+        expect(latestText, 'Testo aggiornato');
+        expect(
+          find.byKey(const Key('honoo-image-zoom-slider')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('Modifica testo conserva il testo e consente il ritorno', (
     tester,
   ) async {
@@ -204,7 +255,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
+    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isFalse);
 
     await tester.tap(find.byKey(const Key('honoo-edit-text')));
     await tester.pump();

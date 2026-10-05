@@ -107,6 +107,7 @@ class HonooBuilderState extends State<HonooBuilder> {
 
   @visibleForTesting
   void setImageBytesForTesting(Uint8List bytes) {
+    _textFocus.unfocus();
     setState(() {
       _imageBytes = bytes;
       _publicImageUrl = '';
@@ -177,7 +178,9 @@ class HonooBuilderState extends State<HonooBuilder> {
 
   void _handleFocusChange() {
     widget.onFocusChanged?.call(_textFocus.hasFocus);
-    setState(() {});
+    setState(() {
+      if (_textFocus.hasFocus) _isEditingText = true;
+    });
   }
 
   void _handleImageTransform() {
@@ -691,7 +694,7 @@ class HonooBuilderState extends State<HonooBuilder> {
                   keyboardType: TextInputType.multiline,
                   textInputAction: TextInputAction.newline,
                   autofocus: !_imageConfirmed && _imageBytes == null,
-                  readOnly: hasImage && !_imageConfirmed && !_isEditingText,
+                  readOnly: _isUploadingFinal,
                   expands: true,
                   scrollPhysics: const ClampingScrollPhysics(),
                   cursorColor: Colors.black,
