@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:mocktail/mocktail.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:honoo/Controller/honoo_controller.dart';
@@ -5,6 +6,7 @@ import 'package:honoo/Entities/honoo.dart';
 import 'package:honoo/Services/duplication_result.dart';
 
 import '../test_supabase_helper.dart';
+import '../pending_query.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +21,48 @@ void main() {
   });
 
   tearDown(() => harness.disableOverrides());
+
+  for (final byId in [false, true]) {
+    test(
+      'deletion invalidates an older chest snapshot (byId: $byId)',
+      () async {
+        harness.stubTable('chest_hidden_conversations');
+        final chain = harness.stubTable('honoo');
+        final row = {
+          'id': 'deleted',
+          'text': 'Old snapshot',
+          'image_url': '',
+          'user_id': 'test_user',
+          'destination': 'chest',
+        };
+        chain.queueResponse([row]);
+        chain.queueResponse([]);
+        final pendingReplies = PendingQuery();
+        final reachedReplies = Completer<void>();
+        when(() => chain.in_('reply_to', any())).thenAnswer((_) {
+          reachedReplies.complete();
+          return pendingReplies;
+        });
+        final controller = HonooController();
+        controller.clearCache();
+        addTearDown(controller.clearCache);
+        final loading = controller.loadChest();
+        await reachedReplies.future;
+        chain.queueResponse([
+          {'id': 'deleted'},
+        ]);
+        if (byId) {
+          await controller.deleteHonooById('deleted');
+        } else {
+          await controller.deleteHonoo(Honoo.fromMap(row));
+        }
+        pendingReplies.response.complete([]);
+        await loading;
+        expect(controller.personal, isEmpty);
+        expect(controller.isLoading.value, isFalse);
+      },
+    );
+  }
 
   test('successful save remains successful when cache refresh fails', () async {
     final chain = harness.stubTable('honoo');

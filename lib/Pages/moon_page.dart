@@ -631,21 +631,18 @@ class _MoonPageState extends State<MoonPage> {
     try {
       await _contentFeedService.deleteMoonContent(kind: kind, id: id);
       if (!mounted) return;
-      // Calcola il target come l'ultimo elemento visto prima di quello cancellato
-      final int desired = (_currentIndex > 0) ? _currentIndex - 1 : 0;
+      final deletedIndex = _items.indexWhere(
+        (item) => isHonoo ? item.honoo?.dbId == id : item.hinooId == id,
+      );
+      if (deletedIndex < 0) return;
       setState(() {
-        _items.removeAt(_currentIndex);
-        if (_items.isEmpty) {
-          _currentIndex = 0;
-        } else {
-          _currentIndex = desired.clamp(0, _items.length - 1);
-        }
+        _items.removeAt(deletedIndex);
+        if (deletedIndex <= _currentIndex) _currentIndex--;
+        _currentIndex = _currentIndex.clamp(
+          0,
+          _items.isEmpty ? 0 : _items.length - 1,
+        );
       });
-      // Allinea il carosello alla nuova pagina target
-      if (_items.isNotEmpty) {
-        // usa jumpToPage per evitare oscillazioni
-        _carouselController.jumpToPage(_currentIndex);
-      }
       showHonooToast(context, message: 'Eliminato dalla Luna.');
     } catch (e) {
       if (!mounted) return;

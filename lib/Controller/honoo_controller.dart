@@ -174,6 +174,9 @@ class HonooController {
 
     await HonooService.deleteHonooById(id);
 
+    // Ignore snapshots started before the confirmed deletion.
+    _loadGeneration++;
+    isLoading.value = false;
     _personal.removeWhere((x) => x.dbId == id);
     version.value++;
   }
@@ -186,6 +189,9 @@ class HonooController {
 
     await HonooService.deleteHonooById(id);
 
+    // Ignore snapshots started before the confirmed deletion.
+    _loadGeneration++;
+    isLoading.value = false;
     _personal.removeWhere((x) => x.dbId == id);
     version.value++;
   }
