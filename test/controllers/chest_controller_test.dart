@@ -323,6 +323,89 @@ void main() {
     },
   );
 
+  for (final deletion in [true, false]) {
+    for (final pendingPhase in ['rows', 'moon', 'error']) {
+      test(
+        '${deletion ? 'deletion' : 'moon publication'} survives stale $pendingPhase load',
+        () async {
+          const row = {
+            'id': 'h-1',
+            'pages': [
+              {
+                'backgroundImage': 'background.png',
+                'text': 'Testo',
+                'isTextWhite': true,
+              },
+            ],
+            'type': 'personal',
+            'user_id': 'user-1',
+          };
+          when(
+            () => repository.fetchHinooRows('user-1'),
+          ).thenAnswer((_) async => [row]);
+          when(
+            () => repository.fetchHinooMoonFingerprints('user-1'),
+          ).thenAnswer((_) async => <String>{});
+          await controller.loadHinoo('user-1');
+
+          final pendingRows = Completer<List<dynamic>>();
+          final pendingMoon = Completer<Set<String>>();
+          final moonStarted = Completer<void>();
+          if (pendingPhase == 'moon') {
+            when(
+              () => repository.fetchHinooMoonFingerprints('user-1'),
+            ).thenAnswer((_) {
+              moonStarted.complete();
+              return pendingMoon.future;
+            });
+          } else {
+            when(
+              () => repository.fetchHinooRows('user-1'),
+            ).thenAnswer((_) => pendingRows.future);
+          }
+          final loading = controller.loadHinoo('user-1');
+          if (pendingPhase == 'moon') await moonStarted.future;
+          expect(controller.value.isHinooLoading, isTrue);
+
+          if (deletion) {
+            controller.removeHinoo('h-1');
+          } else {
+            controller.markHinooOnMoon('h-1');
+          }
+
+          if (pendingPhase == 'moon') {
+            pendingMoon.complete({});
+          } else if (pendingPhase == 'error') {
+            pendingRows.completeError(ArgumentError('stale request failed'));
+          } else {
+            pendingRows.complete([row]);
+          }
+          await loading;
+          expect(controller.value.isHinooLoading, isFalse);
+          expect(controller.value.hinooError, isNull);
+          if (deletion) {
+            expect(controller.value.hinoo, isEmpty);
+          } else {
+            expect(controller.value.hinoo.single.isOnMoon, isTrue);
+          }
+
+          // A later explicit refresh must still be able to publish new data.
+          when(() => repository.fetchHinooRows('user-1')).thenAnswer(
+            (_) async => [
+              {...row, 'id': 'h-2'},
+            ],
+          );
+          when(
+            () => repository.fetchHinooMoonFingerprints('user-1'),
+          ).thenAnswer((_) async => <String>{});
+          await controller.loadHinoo('user-1');
+          expect(controller.value.hinoo.single.id, 'h-2');
+          expect(controller.value.isHinooLoading, isFalse);
+        },
+      );
+    }
+  }
+
   test('loadHinoo non aggiorna lo stato dopo dispose', () async {
     final pendingRows = Completer<List<dynamic>>();
     final disposableController = ChestController(

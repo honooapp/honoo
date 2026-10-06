@@ -228,6 +228,8 @@ class ChestController extends ValueNotifier<ChestState> {
 
   void removeHinoo(String id) {
     if (_isDisposed) return;
+    // A confirmed mutation supersedes snapshots already being fetched.
+    _hinooLoadGeneration++;
     value = ChestState(
       hinoo: value.hinoo.where((item) => item.id != id).toList(),
       honooLatestReplies: value.honooLatestReplies,
@@ -235,7 +237,7 @@ class ChestController extends ValueNotifier<ChestState> {
       honooLatestReceivedReplies: value.honooLatestReceivedReplies,
       hinooLatestReceivedReplies: value.hinooLatestReceivedReplies,
       hinooRepliesByRoot: value.hinooRepliesByRoot,
-      isHinooLoading: value.isHinooLoading,
+      isHinooLoading: false,
       isReplyLoading: value.isReplyLoading,
       hinooError: value.hinooError,
       replyError: value.replyError,
@@ -244,6 +246,8 @@ class ChestController extends ValueNotifier<ChestState> {
 
   void markHinooOnMoon(String id) {
     if (_isDisposed) return;
+    // A confirmed mutation supersedes snapshots already being fetched.
+    _hinooLoadGeneration++;
     value = ChestState(
       hinoo: value.hinoo
           .map(
@@ -265,7 +269,7 @@ class ChestController extends ValueNotifier<ChestState> {
       honooLatestReceivedReplies: value.honooLatestReceivedReplies,
       hinooLatestReceivedReplies: value.hinooLatestReceivedReplies,
       hinooRepliesByRoot: value.hinooRepliesByRoot,
-      isHinooLoading: value.isHinooLoading,
+      isHinooLoading: false,
       isReplyLoading: value.isReplyLoading,
       hinooError: value.hinooError,
       replyError: value.replyError,
