@@ -23,6 +23,7 @@ void main() {
     (tester) async {
       var imageEdits = 0;
       var textEdits = 0;
+      var guestsOpened = 0;
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -37,6 +38,7 @@ void main() {
               height: 500,
               onEditTap: () => imageEdits++,
               onEditTextTap: () => textEdits++,
+              onGuestsTap: () => guestsOpened++,
             ),
           ),
         ),
@@ -45,6 +47,12 @@ void main() {
       expect(find.byTooltip('Scarica casa'), findsOneWidget);
       await tester.tap(find.byTooltip('Modifica casa'));
       await tester.tap(find.byTooltip('Modifica testo'));
+      await tester.tap(find.byTooltip('ospiti'));
+      expect(guestsOpened, 1);
+      expect(
+        tester.getCenter(find.byTooltip('ospiti')).dy,
+        greaterThan(tester.getCenter(find.byTooltip('Modifica casa')).dy),
+      );
       expect(imageEdits, 1);
       expect(textEdits, 1);
       expect(tester.takeException(), isNull);

@@ -5,6 +5,7 @@ import 'package:honoo/Pages/email_login_page.dart';
 import 'package:honoo/Widgets/campanello_card.dart';
 import 'package:honoo/Widgets/campanelli_footer.dart';
 import 'package:honoo/Widgets/busy_overlay.dart';
+import 'package:honoo/Pages/new_honoo_page.dart';
 import 'package:honoo/Widgets/casa_section.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -171,6 +172,14 @@ void main() {
       tester.widget<CampanelliFooter>(find.byType(CampanelliFooter)).onKnock();
       await tester.pumpAndSettle();
       expect(find.byType(BusyOverlay), findsNothing);
+      verifyNever(() => houseAccess.insert(any()));
+      await tester.tap(find.text('Invia un honoo'));
+      await tester.pumpAndSettle();
+      final composer = tester.widget<NewHonooPage>(find.byType(NewHonooPage));
+      expect(composer.recipientTag, 'older');
+      expect(composer.returnSavedId, isTrue);
+      Navigator.of(tester.element(find.byType(NewHonooPage))).pop('sent-honoo');
+      await tester.pumpAndSettle();
       expect(find.textContaining('Bussata inviata.'), findsOneWidget);
       verify(() => houseAccess.insert(any())).called(1);
 
@@ -196,7 +205,10 @@ void main() {
       tester.widget<CampanelliFooter>(find.byType(CampanelliFooter)).onKnock();
       await tester.pumpAndSettle();
       expect(find.text('Entra pure a casa mia'), findsNothing);
-      verify(() => houseAccess.insert(any())).called(1);
+      expect(find.text('Invia un honoo'), findsOneWidget);
+      verifyNever(() => houseAccess.insert(any()));
+      await tester.tap(find.text('Annulla'));
+      await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );

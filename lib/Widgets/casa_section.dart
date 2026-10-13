@@ -21,6 +21,7 @@ class CasaSection extends StatelessWidget {
     required this.height,
     this.onEditTap,
     this.onEditTextTap,
+    this.onGuestsTap,
   });
 
   final CasaData casa;
@@ -34,6 +35,7 @@ class CasaSection extends StatelessWidget {
   final double height;
   final VoidCallback? onEditTap;
   final VoidCallback? onEditTextTap;
+  final VoidCallback? onGuestsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -144,6 +146,17 @@ class CasaSection extends StatelessWidget {
                   onPressed: onEditTap!,
                   tooltip: 'Modifica casa',
                   asset: 'assets/icons/immagine.svg',
+                ),
+              ),
+            if (onGuestsTap != null)
+              Positioned(
+                top: 44,
+                left: 6,
+                child: TextBoxDownloadButton(
+                  key: const ValueKey('own-house-guests'),
+                  tooltip: 'ospiti',
+                  asset: 'assets/icons/ospiti.svg',
+                  onPressed: onGuestsTap!,
                 ),
               ),
             Positioned(

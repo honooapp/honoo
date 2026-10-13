@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -42,6 +44,8 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
   List<ChestItem> _items = const [];
   bool _loading = true;
   Object? _error;
+  RealtimeChannel? _accessChannel;
+  int _loadVersion = 0;
   int _index = 0;
   ConversationEntry? _selectedEntry;
 
@@ -62,22 +66,49 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
   void initState() {
     super.initState();
     _load();
+    final client = SupabaseProvider.client;
+    final userId = client.auth.currentUser?.id;
+    if (userId != null) {
+      try {
+        _accessChannel =
+            client.channel('shared-house-access-${widget.ownerId}-$userId')
+              ..on(
+                RealtimeListenTypes.postgresChanges,
+                ChannelFilter(
+                  event: '*',
+                  schema: 'public',
+                  table: 'house_access',
+                  filter: 'visitor_id=eq.$userId',
+                ),
+                (_, [ref]) {
+                  if (mounted) unawaited(_load());
+                },
+              )
+              ..subscribe();
+      } catch (_) {
+        // The initial server-authorized fetch remains available without Realtime.
+      }
+    }
   }
 
   Future<void> _load() async {
+    final version = ++_loadVersion;
     setState(() {
       _loading = true;
       _error = null;
+      _items = const [];
+      _selectedEntry = null;
+      _index = 0;
     });
     try {
       final items = await _service.fetch(widget.ownerId);
-      if (!mounted) return;
+      if (!mounted || version != _loadVersion) return;
       setState(() {
         _items = items;
         _loading = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || version != _loadVersion) return;
       setState(() {
         _error = error;
         _loading = false;
@@ -87,6 +118,7 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
 
   @override
   void dispose() {
+    _accessChannel?.unsubscribe();
     _pageController.dispose();
     super.dispose();
   }

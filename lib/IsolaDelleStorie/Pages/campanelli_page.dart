@@ -40,6 +40,9 @@ import '../../Pages/casa_share_selection_page.dart';
 import '../../Pages/chest_page.dart';
 import '../../Pages/shared_house_chest_page.dart';
 import '../../Pages/new_hinoo_page.dart';
+import '../../Pages/new_honoo_page.dart';
+import '../../Pages/house_guests_page.dart';
+import '../../Widgets/house_knock_dialog.dart';
 import 'pending_hinoo_page.dart';
 import 'pending_honoo_page.dart';
 
@@ -317,20 +320,42 @@ class _CampanelliPageState extends State<CampanelliPage>
 
     setState(() => _isKnocking = true);
     try {
+      final user = SupabaseProvider.client.auth.currentUser;
+      final targetTag = campanello.campanelloHinooId;
+      if (user == null ||
+          targetTag == null ||
+          targetTag.isEmpty ||
+          campanello.ownerId == user.id) {
+        return;
+      }
+      final kind = await showDialog<HouseKnockContent>(
+        context: context,
+        builder: (_) => const HouseKnockDialog(),
+      );
+      if (kind == null || !mounted) return;
+      final contentId = await Navigator.of(context).push<String>(
+        MaterialPageRoute(
+          builder: (_) => kind == HouseKnockContent.honoo
+              ? NewHonooPage(
+                  forcedType: HonooType.answer,
+                  recipientTag: targetTag,
+                  returnSavedId: true,
+                )
+              : NewHinooPage(
+                  forcedType: HinooType.answer,
+                  recipientTag: targetTag,
+                  returnSavedId: true,
+                ),
+        ),
+      );
+      if (contentId == null || contentId.isEmpty || !mounted) return;
       _showBusyOverlay('Sto bussando');
       try {
-        final user = SupabaseProvider.client.auth.currentUser;
-        final targetTag = campanello.campanelloHinooId;
-        if (user == null ||
-            targetTag == null ||
-            targetTag.isEmpty ||
-            campanello.ownerId == user.id) {
-          _hideBusyOverlay();
-          return;
-        }
         await _campanelliController.sendHouseKnock(
           targetHouseTag: targetTag,
           visitorId: user.id,
+          honooId: kind == HouseKnockContent.honoo ? contentId : null,
+          hinooId: kind == HouseKnockContent.hinoo ? contentId : null,
         );
         _hideBusyOverlay();
         if (mounted) {
@@ -981,19 +1006,8 @@ class _CampanelliPageState extends State<CampanelliPage>
         await _showKnockRequestOnce(knock);
       case CampanelliPendingKnockRemoved():
         setState(() {});
-      case CampanelliAccessGranted(:final targetTag):
-        showHonooToast(context, message: 'La casa è stata aperta');
-        try {
-          HapticFeedback.lightImpact();
-        } catch (error, stackTrace) {
-          debugPrint(
-            '[Campanelli] haptic failed: ${AppFailure.from(error, stackTrace)}',
-          );
-        }
-        final entry = _entryForTag(targetTag);
-        if (entry != null) {
-          setState(() => _unlockedCampanelli.add(entry.campanello.id));
-        }
+      case CampanelliAccessGranted():
+        await _refreshAccess();
     }
   }
 
@@ -1530,6 +1544,17 @@ class _CampanelliPageState extends State<CampanelliPage>
                                 onEditTextTap: isOwnCampanello
                                     ? () => _editCasaText(houseEntry)
                                     : null,
+                                onGuestsTap: isOwnCampanello
+                                    ? () => Navigator.of(context).push<void>(
+                                        MaterialPageRoute(
+                                          builder: (_) => HouseGuestsPage(
+                                            houseTag: houseEntry
+                                                .campanello
+                                                .campanelloHinooId!,
+                                          ),
+                                        ),
+                                      )
+                                    : null,
                                 onEditTap: isOwnCampanello
                                     ? () => _editCasa(houseEntry)
                                     : null,
@@ -1550,6 +1575,17 @@ class _CampanelliPageState extends State<CampanelliPage>
                                 height: casaHeight,
                                 onEditTextTap: isOwnCampanello
                                     ? () => _editCasaText(houseEntry)
+                                    : null,
+                                onGuestsTap: isOwnCampanello
+                                    ? () => Navigator.of(context).push<void>(
+                                        MaterialPageRoute(
+                                          builder: (_) => HouseGuestsPage(
+                                            houseTag: houseEntry
+                                                .campanello
+                                                .campanelloHinooId!,
+                                          ),
+                                        ),
+                                      )
                                     : null,
                                 onEditTap: isOwnCampanello
                                     ? () => _editCasa(houseEntry)

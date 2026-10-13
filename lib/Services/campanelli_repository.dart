@@ -141,6 +141,9 @@ class CampanelliDataRepository {
     String? hinooId,
     String? honooId,
   }) async {
+    if ((hinooId?.isNotEmpty == true) == (honooId?.isNotEmpty == true)) {
+      throw ArgumentError('Invia un honoo o un hinoo per bussare.');
+    }
     await _request(
       () => _client.from('house_access').insert({
         'target_house_tag': targetHouseTag,

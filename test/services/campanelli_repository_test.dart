@@ -45,6 +45,7 @@ void main() {
         repository.sendHouseKnock(
           targetHouseTag: 'house',
           visitorId: 'visitor',
+          honooId: 'honoo',
         ),
         throwsA(isA<TimeoutException>()),
       );
@@ -52,6 +53,21 @@ void main() {
       await result;
     },
   );
+
+  test('rifiuta bussate senza contenuto o con entrambi i contenuti', () async {
+    for (final both in [false, true]) {
+      await expectLater(
+        repository.sendHouseKnock(
+          targetHouseTag: 'house',
+          visitorId: 'visitor',
+          honooId: both ? 'honoo' : null,
+          hinooId: both ? 'hinoo' : null,
+        ),
+        throwsArgumentError,
+      );
+    }
+    verifyNever(() => houseAccess.insert(any()));
+  });
 
   test('fetchPublicAdminCampanelli usa la RPC pubblica dedicata', () async {
     final rpc = MockQueryChain();

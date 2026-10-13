@@ -98,6 +98,7 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/admin-stats-test" @electric-sql/pglite@0.5.8 --no-audit --no-fund
           PGLITE_MODULE="$RUNNER_TEMP/admin-stats-test/node_modules/@electric-sql/pglite/dist/index.js" node tool/test_admin_statistics.mjs
           PGLITE_MODULE="$RUNNER_TEMP/admin-stats-test/node_modules/@electric-sql/pglite/dist/index.js" node tool/test_house_invite_flow.mjs
+          PGLITE_MODULE="$RUNNER_TEMP/admin-stats-test/node_modules/@electric-sql/pglite/dist/index.js" node tool/test_house_guests.mjs
 
   verify-release:
     name: Analyze and test
