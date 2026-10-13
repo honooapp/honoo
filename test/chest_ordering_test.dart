@@ -30,56 +30,59 @@ ChestOrganization<_Item> _organize(List<_Item> items) {
 }
 
 void main() {
-  test('i filtri dello Scrigno di casa includono tutto con l’ultima icona', () {
-    expect(
-      ChestOrganizer.matchesCasaFilter(
-        filter: CasaChestFilter.authored,
-        isFromMoonSaved: false,
-        hasConversation: false,
-      ),
-      isTrue,
+  for (final fromMoon in [false, true]) {
+    test(
+      'lo scrigno mantiene il contenuto dopo una risposta (luna: $fromMoon)',
+      () {
+        final created = DateTime(2024, 1, 1);
+        final received = created.add(const Duration(days: 1));
+        final filter = fromMoon
+            ? CasaChestFilter.moonSaved
+            : CasaChestFilter.authored;
+        final original = _Item(id: 'root', createdAt: created);
+        final withReply = _Item(
+          id: 'root',
+          createdAt: created,
+          conversationId: 'conversation',
+          latestReply: received,
+          latestNotification: received,
+        );
+        List<_Item> visible(_Item item) => [item]
+            .where(
+              (_) => ChestOrganizer.matchesCasaFilter(
+                filter: filter,
+                isFromMoonSaved: fromMoon,
+              ),
+            )
+            .toList();
+
+        expect(_organize(visible(original)).items.single.id, 'root');
+        final updated = _organize(visible(withReply));
+        expect(updated.items.single.conversationId, 'conversation');
+        expect(updated.conversationItemCount, 1);
+        expect(updated.latestNotificationItemIndex, 0);
+        expect(updated.items.single.latestNotification, received);
+        expect(
+          ChestOrganizer.matchesCasaFilter(
+            filter: fromMoon
+                ? CasaChestFilter.authored
+                : CasaChestFilter.moonSaved,
+            isFromMoonSaved: fromMoon,
+          ),
+          isFalse,
+        );
+        for (final allFilter in [null, CasaChestFilter.all]) {
+          expect(
+            ChestOrganizer.matchesCasaFilter(
+              filter: allFilter,
+              isFromMoonSaved: fromMoon,
+            ),
+            isTrue,
+          );
+        }
+      },
     );
-    expect(
-      ChestOrganizer.matchesCasaFilter(
-        filter: CasaChestFilter.moonSaved,
-        isFromMoonSaved: true,
-        hasConversation: false,
-      ),
-      isTrue,
-    );
-    expect(
-      ChestOrganizer.matchesCasaFilter(
-        filter: CasaChestFilter.all,
-        isFromMoonSaved: true,
-        hasConversation: true,
-      ),
-      isTrue,
-    );
-    expect(
-      ChestOrganizer.matchesCasaFilter(
-        filter: CasaChestFilter.all,
-        isFromMoonSaved: false,
-        hasConversation: false,
-      ),
-      isTrue,
-    );
-    expect(
-      ChestOrganizer.matchesCasaFilter(
-        filter: CasaChestFilter.authored,
-        isFromMoonSaved: false,
-        hasConversation: true,
-      ),
-      isFalse,
-    );
-    expect(
-      ChestOrganizer.matchesCasaFilter(
-        filter: CasaChestFilter.moonSaved,
-        isFromMoonSaved: true,
-        hasConversation: true,
-      ),
-      isFalse,
-    );
-  });
+  }
 
   group('ChestOrganizer', () {
     test('ordina gli elementi normali per data DESC e id stabile', () {

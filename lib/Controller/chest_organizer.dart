@@ -28,18 +28,18 @@ class ChestNotificationTarget {
 class ChestOrganizer {
   const ChestOrganizer._();
 
+  // Replies do not change which chest the original content belongs to.
   static bool matchesCasaFilter({
     required CasaChestFilter? filter,
     required bool isFromMoonSaved,
-    required bool hasConversation,
   }) {
     switch (filter) {
       case null:
         return true;
       case CasaChestFilter.authored:
-        return !hasConversation && !isFromMoonSaved;
+        return !isFromMoonSaved;
       case CasaChestFilter.moonSaved:
-        return !hasConversation && isFromMoonSaved;
+        return isFromMoonSaved;
       case CasaChestFilter.all:
         return true;
     }

@@ -362,15 +362,6 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
 
     final items = [...honooItems, ...hinooItems]
         .where((item) {
-          final conversationId = _conversationIdForItemFilter(item);
-          final hasConversation =
-              (conversationId != null &&
-                  (_honooLatestReplies.containsKey(conversationId) ||
-                      _hinooLatestReplies.containsKey(conversationId))) ||
-              item.when(
-                honoo: (honoo) => honoo.hasReplies,
-                hinoo: (_) => false,
-              );
           final isFromMoonSaved = item.when(
             honoo: (honoo) => honoo.isFromMoonSaved,
             hinoo: (hinoo) => hinoo.isFromMoonSaved,
@@ -379,7 +370,6 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
             return ChestOrganizer.matchesCasaFilter(
               filter: widget.casaFilter,
               isFromMoonSaved: isFromMoonSaved,
-              hasConversation: hasConversation,
             );
           }
           switch (widget.initialFilter) {
@@ -544,12 +534,6 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
           (_hinooRepliesByRoot[rootId]?.isNotEmpty ?? false);
       return hasActivity ? rootId : null;
     },
-  );
-
-  String? _conversationIdForItemFilter(ChestItem item) => item.when(
-    honoo: (honoo) => honoo.conversationId ?? honoo.dbId,
-    hinoo: (hinoo) =>
-        hinoo.conversationId ?? hinoo.draft.conversationId ?? hinoo.id,
   );
 
   String? _conversationIdForDeletion(ChestItem item) {
