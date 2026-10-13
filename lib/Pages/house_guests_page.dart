@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../Entities/casa_share_mode.dart';
 import '../Services/house_guests_service.dart';
 import '../UI/hinoo_viewer.dart';
@@ -71,7 +72,25 @@ class _HouseGuestsPageState extends State<HouseGuestsPage> {
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: HonooColor.background,
     appBar: AppBar(
-      title: const Text('ospiti'),
+      centerTitle: true,
+      title: Text(
+        'ospiti',
+        style: GoogleFonts.libreFranklin(
+          fontSize: 28,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+      ),
+      leading: IconButton(
+        tooltip: 'Indietro',
+        onPressed: () => Navigator.of(context).maybePop(),
+        icon: SvgPicture.asset(
+          'assets/icons/arrow_left.svg',
+          width: 32,
+          height: 32,
+          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+        ),
+      ),
       backgroundColor: HonooColor.background,
       foregroundColor: Colors.white,
     ),
@@ -127,6 +146,7 @@ class _HouseGuestsPageState extends State<HouseGuestsPage> {
                                             ? HonooCard(honoo: guest.honoo!)
                                             : guest.hinoo != null
                                             ? HinooViewer(
+                                                key: ValueKey(guest.id),
                                                 draft: guest.hinoo!,
                                                 maxWidth: 360,
                                                 maxHeight: 540,
