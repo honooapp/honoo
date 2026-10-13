@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:honoo/Entities/hinoo.dart';
 import 'package:honoo/Entities/casa_share_mode.dart';
@@ -333,16 +334,24 @@ class _CampanelliPageState extends State<CampanelliPage>
         builder: (_) => const HouseKnockDialog(),
       );
       if (kind == null || !mounted) return;
+      // Ogni bussata avvia un filo distinto sul campanello della casa.
+      final conversationId = const Uuid().v4();
       final contentId = await Navigator.of(context).push<String>(
         MaterialPageRoute(
           builder: (_) => kind == HouseKnockContent.honoo
               ? NewHonooPage(
                   forcedType: HonooType.answer,
+                  replyTo: targetTag,
+                  conversationId: conversationId,
+                  targetContentName: 'campanello',
                   recipientTag: targetTag,
                   returnSavedId: true,
                 )
               : NewHinooPage(
                   forcedType: HinooType.answer,
+                  replyTo: targetTag,
+                  conversationId: conversationId,
+                  targetContentName: 'campanello',
                   recipientTag: targetTag,
                   returnSavedId: true,
                 ),

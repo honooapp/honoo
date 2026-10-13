@@ -6,6 +6,11 @@ import 'package:honoo/Widgets/campanello_card.dart';
 import 'package:honoo/Widgets/campanelli_footer.dart';
 import 'package:honoo/Widgets/busy_overlay.dart';
 import 'package:honoo/Pages/new_honoo_page.dart';
+import 'package:honoo/Pages/new_hinoo_page.dart';
+import 'package:honoo/Entities/honoo.dart';
+import 'package:honoo/Entities/hinoo.dart';
+import 'package:honoo/Services/honoo_service.dart';
+import 'package:honoo/Services/hinoo_service.dart';
 import 'package:honoo/Widgets/casa_section.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -168,20 +173,97 @@ void main() {
       card = tester.widget(find.byType(CampanelloCard));
       expect(card.data.text, 'Campanello più vecchio');
 
-      // Nessun evento realtime: il proprietario può essere offline.
-      tester.widget<CampanelliFooter>(find.byType(CampanelliFooter)).onKnock();
-      await tester.pumpAndSettle();
-      expect(find.byType(BusyOverlay), findsNothing);
-      verifyNever(() => houseAccess.insert(any()));
-      await tester.tap(find.text('Invia un honoo'));
-      await tester.pumpAndSettle();
-      final composer = tester.widget<NewHonooPage>(find.byType(NewHonooPage));
-      expect(composer.recipientTag, 'older');
-      expect(composer.returnSavedId, isTrue);
-      Navigator.of(tester.element(find.byType(NewHonooPage))).pop('sent-honoo');
-      await tester.pumpAndSettle();
-      expect(find.textContaining('Bussata inviata.'), findsOneWidget);
-      verify(() => houseAccess.insert(any())).called(1);
+      // Esegue i publisher reali con i parametri ricevuti dai due editor.
+      final honoo = harness.stubTable('honoo');
+      String? previousConversationId;
+      for (final isHonoo in [true, false]) {
+        tester
+            .widget<CampanelliFooter>(find.byType(CampanelliFooter))
+            .onKnock();
+        await tester.pumpAndSettle();
+        expect(find.byType(BusyOverlay), findsNothing);
+        verifyNever(() => houseAccess.insert(any()));
+        await tester.tap(
+          find.text(isHonoo ? 'Invia un honoo' : 'Invia un hinoo'),
+        );
+        await tester.pumpAndSettle();
+
+        final String? replyTo;
+        final String? recipientTag;
+        final String? conversationId;
+        final String savedId;
+        final MockQueryChain contentTable;
+        final Finder editor;
+        if (isHonoo) {
+          editor = find.byType(NewHonooPage);
+          final composer = tester.widget<NewHonooPage>(editor);
+          expect(composer.returnSavedId, isTrue);
+          replyTo = composer.replyTo;
+          recipientTag = composer.recipientTag;
+          conversationId = composer.conversationId;
+          contentTable = honoo;
+          honoo.queueResponse({'id': 'sent-honoo'});
+          final content = Honoo(
+            0,
+            'Busso alla tua casa',
+            'bg.png',
+            '',
+            '',
+            'test_user',
+            composer.forcedType!,
+            replyTo,
+            recipientTag,
+          )..conversationId = conversationId;
+          savedId = await HonooService.publishHonooAndReturnId(content);
+        } else {
+          editor = find.byType(NewHinooPage);
+          final composer = tester.widget<NewHinooPage>(editor);
+          expect(composer.returnSavedId, isTrue);
+          replyTo = composer.replyTo;
+          recipientTag = composer.recipientTag;
+          conversationId = composer.conversationId;
+          contentTable = hinoo;
+          hinoo.queueResponse({'id': 'sent-hinoo'});
+          savedId = await HinooService.publishHinooAndReturnId(
+            HinooDraft(
+              pages: const [
+                HinooSlide(
+                  text: 'Busso alla tua casa',
+                  backgroundImage: 'bg.png',
+                  isTextWhite: true,
+                ),
+              ],
+              type: composer.forcedType!,
+              replyTo: replyTo,
+              recipientTag: recipientTag,
+              conversationId: conversationId,
+            ),
+          );
+        }
+        expect(replyTo, 'older');
+        expect(recipientTag, 'older');
+        expect(conversationId, isNotNull);
+        expect(conversationId, isNot(isEmpty));
+        expect(conversationId, isNot(previousConversationId));
+        previousConversationId = conversationId;
+        final payload =
+            verify(() => contentTable.insert(captureAny())).captured.single
+                as Map<String, dynamic>;
+        expect(payload['reply_to'], 'older');
+        expect(payload['recipient_tag'], 'older');
+        expect(payload['conversation_id'], conversationId);
+        Navigator.of(tester.element(editor)).pop(savedId);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Bussata inviata.'), findsOneWidget);
+        Navigator.of(
+          tester.element(find.textContaining('Bussata inviata.')),
+        ).pop();
+        await tester.pumpAndSettle();
+        final knock =
+            verify(() => houseAccess.insert(captureAny())).captured.single
+                as Map<String, dynamic>;
+        expect(knock[isHonoo ? 'honoo_id' : 'hinoo_id'], savedId);
+      }
 
       // Recupera anche un permesso concesso mentre realtime era assente.
       houseAccess.queueResponse(const [
