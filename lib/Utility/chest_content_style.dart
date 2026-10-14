@@ -77,10 +77,8 @@ class ChestContentStyle {
     }
   }
 
-  /// Nella conversazione ogni contenuto dell'altro autore è rosso.
-  ///
-  /// Un contenuto salvato dalla Luna resta attribuito all'autore originale
-  /// anche quando la copia nello Scrigno è posseduta dall'utente corrente.
+  /// I contenuti salvati dalla Luna restano bianchi anche nella conversazione.
+  /// Le risposte ricevute dagli altri autori sono rosse.
   static ChestContentStyle forConversationEntry(
     ConversationEntry entry, {
     String? viewerUserId,
@@ -92,7 +90,7 @@ class ChestContentStyle {
         entry.isFromMoonSaved || entry.hinoo!.isFromMoonSaved,
       ConversationEntryKind.deleted => false,
     };
-    if (isFromMoonSaved) return receivedReply;
+    if (isFromMoonSaved) return moon;
     final ownerId = entry.ownerId;
     if (viewerUserId != null && ownerId != null && ownerId != viewerUserId) {
       return receivedReply;

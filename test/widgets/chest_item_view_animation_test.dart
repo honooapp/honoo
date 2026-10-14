@@ -108,6 +108,7 @@ void main() {
           home: Scaffold(
             body: ChestItemView(
               item: ChestItem.honoo(root, DateTime.utc(2026, 7, 25)),
+              resolvedConversationId: 'legacy-root',
               availableHeight: 600,
               maxWidth: 800,
               honooMetrics: ResponsiveLayout.honooBuilderMetrics(
@@ -222,20 +223,17 @@ void main() {
   });
 
   testWidgets(
-    'un Honoo storico con risposte usa la radice come id conversazione',
+    'usa la conversazione rilevata dallo Scrigno anche senza hasReplies',
     (tester) async {
-      final root =
-          Honoo(
-              0,
-              'Conversazione storica',
-              '',
-              '2026-07-25T10:00:00Z',
-              '',
-              'test_user',
-              HonooType.personal,
-            )
-            ..dbId = 'legacy-root'
-            ..hasReplies = true;
+      final root = Honoo(
+        0,
+        'Conversazione storica',
+        '',
+        '2026-07-25T10:00:00Z',
+        '',
+        'test_user',
+        HonooType.personal,
+      )..dbId = 'legacy-root';
       harness.stubTable('honoo').queueResponse([]);
       harness.stubTable('hinoo').queueResponse([]);
       harness.stubTable('conversation_tombstones').queueResponse([]);
@@ -245,6 +243,7 @@ void main() {
           home: Scaffold(
             body: ChestItemView(
               item: ChestItem.honoo(root, DateTime.utc(2026, 7, 25)),
+              resolvedConversationId: 'legacy-root',
               availableHeight: 600,
               maxWidth: 800,
               honooMetrics: ResponsiveLayout.honooBuilderMetrics(

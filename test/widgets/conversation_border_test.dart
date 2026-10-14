@@ -180,7 +180,7 @@ void main() {
     expect(borderWithColor(HonooColor.secondary), findsNothing);
   });
 
-  test('Honoo salvato dalla Luna diventa rosso nella conversazione', () {
+  test('Honoo salvato dalla Luna resta bianco nella conversazione', () {
     final value = honoo(
       type: HonooType.personal,
       owner: 'test_user',
@@ -192,9 +192,28 @@ void main() {
         ConversationEntry.honoo(value),
         viewerUserId: 'test_user',
       ),
-      same(ChestContentStyle.receivedReply),
+      same(ChestContentStyle.moon),
     );
   });
+
+  test(
+    'Hinoo salvato dalla Luna resta bianco anche se attribuito ad altri',
+    () {
+      final draft = hinoo().copyWith(isFromMoonSaved: true);
+      expect(
+        ChestContentStyle.forConversationEntry(
+          ConversationEntry.hinoo(
+            draft,
+            createdAt: DateTime.utc(2026, 10, 14),
+            ownerId: 'other_user',
+            isFromMoonSaved: true,
+          ),
+          viewerUserId: 'test_user',
+        ),
+        same(ChestContentStyle.moon),
+      );
+    },
+  );
 
   test('Honoo Luna storico diventa rosso nella conversazione', () {
     final value = honoo(type: HonooType.moon, owner: 'other_user');

@@ -32,9 +32,11 @@ class ChestItemView extends StatelessWidget {
     required this.onDownload,
     required this.conversationRefreshToken,
     this.onSaved,
+    this.resolvedConversationId,
   });
 
   final VoidCallback? onSaved;
+  final String? resolvedConversationId;
   final ChestItem item;
   final double availableHeight;
   final double maxWidth;
@@ -74,7 +76,7 @@ class ChestItemView extends StatelessWidget {
       item,
       viewerUserId: viewerUserId,
     );
-    final conversationId = _effectiveConversationId();
+    final conversationId = resolvedConversationId ?? _effectiveConversationId();
     final content = item.when(
       honoo: (honoo) => _buildHonoo(honoo, conversationId),
       hinoo: (hinoo) =>
@@ -114,11 +116,13 @@ class ChestItemView extends StatelessWidget {
     honoo: (honoo) {
       final explicitId = honoo.conversationId;
       if (explicitId != null && explicitId.isNotEmpty) return explicitId;
+      if (honoo.replyTo?.isNotEmpty == true) return honoo.replyTo;
       return honoo.hasReplies ? honoo.dbId : null;
     },
     hinoo: (hinoo) {
       final explicitId = hinoo.conversationId ?? hinoo.draft.conversationId;
       if (explicitId != null && explicitId.isNotEmpty) return explicitId;
+      if (hinoo.draft.replyTo?.isNotEmpty == true) return hinoo.draft.replyTo;
       return hinooRepliesByRoot[hinoo.id]?.isNotEmpty == true ? hinoo.id : null;
     },
   );

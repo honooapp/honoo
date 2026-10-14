@@ -2,6 +2,7 @@ import 'package:honoo/Services/supabase_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../Entities/honoo.dart';
 import 'duplication_result.dart';
+import 'chest_recipient_filter.dart';
 import 'reliability_policy.dart';
 
 class HonooService {
@@ -70,6 +71,9 @@ class HonooService {
   /// Radici personali e risposte inviate o ricevute che devono comparire
   /// come un solo accesso persistente alla conversazione nello Scrigno.
   static Future<List<Honoo>> fetchUserChestHonoo(String userId) async {
+    final recipientFilter = await _reliability.read(
+      () => chestRecipientFilter(_client, userId),
+    );
     final hiddenResponse = await _reliability.read(
       () async => await _client
           .from('chest_hidden_conversations')
@@ -86,9 +90,7 @@ class HonooService {
           .from('honoo')
           .select('*')
           .in_('destination', ['chest', 'reply'])
-          .or(
-            'user_id.eq.$userId,and(destination.eq.reply,recipient_tag.eq.$userId)',
-          )
+          .or('user_id.eq.$userId,and(destination.eq.reply,$recipientFilter)')
           .order('created_at', ascending: false),
     );
     return (response as List)

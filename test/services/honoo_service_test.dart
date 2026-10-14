@@ -43,6 +43,7 @@ void main() {
   late _MockSupabaseClient client;
   late _MockQueryChain chain;
   late _MockQueryChain hiddenConversations;
+  late _MockQueryChain users;
   late _MockAuth auth;
   late _MockSession session;
   late _MockUser user;
@@ -53,6 +54,11 @@ void main() {
 
   setUp(() {
     client = _MockSupabaseClient();
+    users = _MockQueryChain();
+    users.queueResponse(<Map<String, dynamic>>[]);
+    when(() => client.from('users')).thenAnswer((_) => users);
+    when(() => users.select(any())).thenAnswer((_) => users);
+    when(() => users.eq(any(), any())).thenAnswer((_) => users);
     chain = _MockQueryChain();
     hiddenConversations = _MockQueryChain();
     auth = _MockAuth();
@@ -158,6 +164,27 @@ void main() {
         ),
       ).called(1);
       verify(() => chain.order('created_at', ascending: false)).called(1);
+    },
+  );
+
+  test(
+    'fetchUserChestHonoo include il destinatario con indirizzo storico',
+    () async {
+      final aliases = _MockQueryChain();
+      when(() => client.from('users')).thenAnswer((_) => aliases);
+      when(() => aliases.select(any())).thenAnswer((_) => aliases);
+      when(() => aliases.eq(any(), any())).thenAnswer((_) => aliases);
+      aliases.queueResponse([
+        {'address': 'casa-storica'},
+      ]);
+      hiddenConversations.queueResponse(<Map<String, dynamic>>[]);
+      chain.queueResponse(<Map<String, dynamic>>[]);
+      await HonooService.fetchUserChestHonoo('user-1');
+      verify(
+        () => chain.or(
+          'user_id.eq.user-1,and(destination.eq.reply,recipient_tag.in.("user-1","casa-storica"))',
+        ),
+      ).called(1);
     },
   );
 

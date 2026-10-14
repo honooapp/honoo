@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_provider.dart';
+import 'chest_recipient_filter.dart';
 import 'reliability_policy.dart';
 
 /// Accesso dati dello Scrigno. Non contiene stato, mapping UI o ordinamento.
@@ -53,6 +54,7 @@ class ChestRepository {
 
   Future<List<dynamic>> fetchHinooRows(String userId) async {
     final hidden = await fetchHiddenConversationIds(userId);
+    final recipientFilter = await chestRecipientFilter(_client, userId);
     try {
       final rows = await _client
           .from('hinoo')
@@ -61,7 +63,7 @@ class ChestRepository {
           )
           .in_('type', ['personal', 'answer'])
           .or(
-            'user_id.eq.$userId,and(recipient_tag.eq.$userId,or(type.eq.answer,reply_to.not.is.null,conversation_id.not.is.null))',
+            'user_id.eq.$userId,and($recipientFilter,or(type.eq.answer,reply_to.not.is.null,conversation_id.not.is.null))',
           )
           .order('created_at', ascending: false);
       return _withoutHiddenConversations(rows, hidden);
@@ -77,7 +79,7 @@ class ChestRepository {
           )
           .in_('type', ['personal', 'answer'])
           .or(
-            'user_id.eq.$userId,and(recipient_tag.eq.$userId,or(type.eq.answer,reply_to.not.is.null,conversation_id.not.is.null))',
+            'user_id.eq.$userId,and($recipientFilter,or(type.eq.answer,reply_to.not.is.null,conversation_id.not.is.null))',
           )
           .order('created_at', ascending: false);
       return _withoutHiddenConversations(rows, hidden);
@@ -86,11 +88,12 @@ class ChestRepository {
 
   Future<List<dynamic>> fetchHonooReplyRows(String userId) async {
     final hidden = await fetchHiddenConversationIds(userId);
+    final recipientFilter = await chestRecipientFilter(_client, userId);
     final repliesToUser = await _client
         .from('honoo')
         .select('conversation_id,reply_to,created_at,user_id')
         .eq('destination', 'reply')
-        .eq('recipient_tag', userId);
+        .or(recipientFilter);
     final repliesFromUser = await _client
         .from('honoo')
         .select('conversation_id,reply_to,created_at,user_id')
@@ -107,6 +110,7 @@ class ChestRepository {
     List<String> _,
   ) async {
     final hidden = await fetchHiddenConversationIds(userId);
+    final recipientFilter = await chestRecipientFilter(_client, userId);
     final repliesToUser = await _client
         .from('hinoo')
         .select(
@@ -115,7 +119,7 @@ class ChestRepository {
         .or(
           'type.eq.answer,and(conversation_id.not.is.null,recipient_tag.not.is.null)',
         )
-        .eq('recipient_tag', userId)
+        .or(recipientFilter)
         .order('created_at', ascending: true);
     final repliesFromUser = await _client
         .from('hinoo')

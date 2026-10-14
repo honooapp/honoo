@@ -516,6 +516,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     honoo: (honoo) {
       final explicitId = honoo.conversationId;
       if (explicitId != null && explicitId.isNotEmpty) return explicitId;
+      if (honoo.replyTo?.isNotEmpty == true) return honoo.replyTo;
       final rootId = honoo.dbId;
       if (rootId == null || rootId.isEmpty) return null;
       final hasActivity =
@@ -527,6 +528,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     hinoo: (hinoo) {
       final explicitId = hinoo.conversationId ?? hinoo.draft.conversationId;
       if (explicitId != null && explicitId.isNotEmpty) return explicitId;
+      if (hinoo.draft.replyTo?.isNotEmpty == true) return hinoo.draft.replyTo;
       final rootId = hinoo.id;
       final hasActivity =
           _honooLatestReplies.containsKey(rootId) ||
@@ -1134,6 +1136,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
       honooMetrics: honooMetrics,
       repaintKey: repaintKey,
       hinooRepliesByRoot: _hinooRepliesByRoot,
+      resolvedConversationId: _convIdOfItem(item),
       isNormalMode: _mode == ChestMode.normal,
       isActive: isActive,
       highlightLatest: widget.highlightLatest,

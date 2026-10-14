@@ -14,6 +14,7 @@ void main() {
 
   setUp(() {
     harness = SupabaseTestHarness(withAuthenticatedUser: true);
+    harness.stubTable('users');
     hinoo = harness.stubTable('hinoo');
     hiddenConversations = harness.stubTable('chest_hidden_conversations');
     repository = ChestRepository(client: harness.client);
@@ -129,6 +130,28 @@ void main() {
         'type.eq.answer,and(conversation_id.not.is.null,recipient_tag.not.is.null)',
       ),
     ).called(2);
+  });
+
+  test('include indirizzi storici in contenuti e attività ricevuta', () async {
+    final users = harness.stubTable('users');
+    for (var i = 0; i < 3; i++) {
+      users.queueResponse([
+        {'address': 'casa-storica'},
+      ]);
+    }
+    final honoo = harness.stubTable('honoo');
+    await repository.fetchHinooRows('user-1');
+    await repository.fetchHonooReplyRows('user-1');
+    await repository.fetchHinooReplyRows('user-1', const []);
+    const recipient = 'recipient_tag.in.("user-1","casa-storica")';
+    verify(
+      () => hinoo.or(
+        'user_id.eq.user-1,and($recipient,or(type.eq.answer,reply_to.not.is.null,conversation_id.not.is.null))',
+      ),
+    ).called(1);
+    verify(() => honoo.or(recipient)).called(1);
+    verify(() => hinoo.or(recipient)).called(1);
+    verify(() => users.eq('auth_id', 'user-1')).called(3);
   });
 
   test('deleteHinoo elimina esclusivamente la riga indicata', () async {

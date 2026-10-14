@@ -24,14 +24,18 @@ class ConversationService {
           .select(
             'id,text,image_url,destination,reply_to,recipient_tag,created_at,updated_at,user_id,conversation_id,is_from_moon_saved,admin_deleted_at',
           )
-          .eq('conversation_id', conversationId)
+          .or(
+            'conversation_id.eq.$conversationId,and(conversation_id.is.null,or(id.eq.$conversationId,reply_to.eq.$conversationId))',
+          )
           .order('created_at', ascending: true),
       _client
           .from('hinoo')
           .select(
             'id,pages,type,recipient_tag,reply_to,created_at,user_id,conversation_id,is_from_moon_saved,admin_deleted_at',
           )
-          .eq('conversation_id', conversationId)
+          .or(
+            'conversation_id.eq.$conversationId,and(conversation_id.is.null,or(id.eq.$conversationId,reply_to.eq.$conversationId))',
+          )
           .order('created_at', ascending: true),
       _client
           .from('conversation_tombstones')

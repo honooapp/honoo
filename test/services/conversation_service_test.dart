@@ -58,8 +58,56 @@ void main() {
       ConversationEntryKind.hinoo,
     ]);
     expect(result.last.createdAt, DateTime.parse('2026-01-01T11:00:00Z'));
-    verify(() => honoo.eq('conversation_id', 'conversation-1')).called(1);
-    verify(() => hinoo.eq('conversation_id', 'conversation-1')).called(1);
+    verify(
+      () => honoo.or(
+        'conversation_id.eq.conversation-1,and(conversation_id.is.null,or(id.eq.conversation-1,reply_to.eq.conversation-1))',
+      ),
+    ).called(1);
+    verify(
+      () => hinoo.or(
+        'conversation_id.eq.conversation-1,and(conversation_id.is.null,or(id.eq.conversation-1,reply_to.eq.conversation-1))',
+      ),
+    ).called(1);
+  });
+
+  test('carica radice e risposte legacy senza conversation_id', () async {
+    final honoo = harness.stubTable('honoo');
+    final hinoo = harness.stubTable('hinoo');
+    honoo.queueResponse([
+      {
+        'id': 'root',
+        'text': 'radice',
+        'destination': 'chest',
+        'created_at': '2026-01-01T10:00:00Z',
+        'user_id': 'test_user',
+      },
+      {
+        'id': 'reply',
+        'text': 'risposta',
+        'destination': 'reply',
+        'reply_to': 'root',
+        'created_at': '2026-01-01T11:00:00Z',
+        'user_id': 'other',
+      },
+    ]);
+    hinoo.queueResponse([
+      {
+        'id': 'hinoo-reply',
+        'pages': [
+          {'text': 'risposta hinoo'},
+        ],
+        'type': 'answer',
+        'reply_to': 'root',
+        'created_at': '2026-01-01T12:00:00Z',
+        'user_id': 'other',
+      },
+    ]);
+    final entries = await ConversationService.fetchConversation('root');
+    expect(entries.map((e) => e.id), ['root', 'reply', 'hinoo-reply']);
+    const filter =
+        'conversation_id.eq.root,and(conversation_id.is.null,or(id.eq.root,reply_to.eq.root))';
+    verify(() => honoo.or(filter)).called(1);
+    verify(() => hinoo.or(filter)).called(1);
   });
 
   test('riconosce una vecchia risposta Hinoo anche senza reply_to', () async {
