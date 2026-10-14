@@ -181,11 +181,11 @@ class SeaFooterBar extends StatelessWidget {
                       height: 55,
                     ),
                     padding: EdgeInsets.zero,
-                    iconSize: 55,
+                    iconSize: 27.5,
                     icon: SvgPicture.asset(
                       'assets/icons/ospiti.svg',
-                      width: 55,
-                      height: 55,
+                      width: 27.5,
+                      height: 27.5,
                       semanticsLabel: 'La tua casa',
                     ),
                     onPressed: () => Navigator.of(context).push(
