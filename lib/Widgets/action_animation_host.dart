@@ -17,6 +17,8 @@ class ActionAnimationHost extends StatefulWidget {
 class _ActionAnimationHostState extends State<ActionAnimationHost> {
   VideoPlayerController? _controller;
   Completer<void>? _completion;
+  VoidCallback? _retryWithAudio;
+  Size _videoSize = Size.zero;
   Future<void> _queue = Future<void>.value();
   late final Future<void> Function(ActionAnimation) _presenter = _enqueue;
 
@@ -36,31 +38,73 @@ class _ActionAnimationHostState extends State<ActionAnimationHost> {
     final controller = VideoPlayerController.asset(animation.asset);
     final completion = Completer<void>();
     _completion = completion;
+    VideoPlayerValue? initializedValue;
+    var retried = false;
+    Timer? watchdog;
     void finish() {
       if (!completion.isCompleted) completion.complete();
     }
 
-    void listen() {
-      final value = controller.value;
-      if (value.hasError || value.isCompleted) finish();
+    void handlePlaybackError() {
+      final ready = initializedValue;
+      if (ready == null || retried) {
+        finish();
+        return;
+      }
+      if (!mounted || completion.isCompleted) return;
+      setState(() {
+        _retryWithAudio = () {
+          retried = true;
+          watchdog?.cancel();
+          watchdog = Timer(const Duration(seconds: 30), finish);
+          setState(() => _retryWithAudio = null);
+          // The web plugin replaces the value on an autoplay rejection, even
+          // though the underlying video is still loaded. Restore it so play()
+          // reaches that same video synchronously inside the user's gesture.
+          controller.value = ready;
+          unawaited(controller.play().catchError((Object _) => finish()));
+        };
+      });
     }
 
-    final watchdog = Timer(const Duration(seconds: 30), finish);
+    void listen() {
+      final value = controller.value;
+      if (value.hasError) {
+        handlePlaybackError();
+      } else if (value.isCompleted) {
+        finish();
+      }
+    }
+
+    watchdog = Timer(const Duration(seconds: 30), finish);
     controller.addListener(listen);
     try {
       await controller.initialize().timeout(const Duration(seconds: 8));
       if (!mounted || completion.isCompleted) return;
-      await controller.setVolume(0); // Allows autoplay on mobile browsers.
+      await controller.setVolume(1);
       if (!mounted || completion.isCompleted) return;
-      setState(() => _controller = controller);
-      await controller.play().timeout(const Duration(seconds: 5));
+      initializedValue = controller.value;
+      setState(() {
+        _controller = controller;
+        _videoSize = controller.value.size;
+      });
+      try {
+        await controller.play().timeout(const Duration(seconds: 5));
+      } catch (_) {
+        handlePlaybackError();
+      }
       await completion.future;
     } catch (_) {
       // Keep the successful operation and its navigation intact.
     } finally {
-      watchdog.cancel();
+      watchdog?.cancel();
       controller.removeListener(listen);
-      if (mounted) setState(() => _controller = null);
+      if (mounted) {
+        setState(() {
+          _controller = null;
+          _retryWithAudio = null;
+        });
+      }
       _completion = null;
       // Native cleanup must not hold up navigation or the next animation.
       unawaited(controller.dispose().catchError((Object _) {}));
@@ -101,10 +145,39 @@ class _ActionAnimationHostState extends State<ActionAnimationHost> {
                     child: FittedBox(
                       fit: BoxFit.contain,
                       child: SizedBox(
-                        width: controller.value.size.width,
-                        height: controller.value.size.height,
+                        width: _videoSize.width,
+                        height: _videoSize.height,
                         child: VideoPlayer(controller),
                       ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (_retryWithAudio != null)
+            Positioned.fill(
+              child: Material(
+                color: Colors.black87,
+                child: SafeArea(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: _retryWithAudio,
+                          icon: const Icon(Icons.volume_up),
+                          label: const Text('Riproduci con audio'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            final completion = _completion;
+                            if (completion != null && !completion.isCompleted) {
+                              completion.complete();
+                            }
+                          },
+                          child: const Text('Continua'),
+                        ),
+                      ],
                     ),
                   ),
                 ),
