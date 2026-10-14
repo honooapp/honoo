@@ -513,7 +513,8 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
     );
     final style =
         showAsOwnedContent &&
-            !identical(conversationStyle, ChestContentStyle.receivedReply)
+            !identical(conversationStyle, ChestContentStyle.receivedReply) &&
+            !identical(conversationStyle, ChestContentStyle.moon)
         ? ChestContentStyle.own
         : conversationStyle;
     final Widget card;

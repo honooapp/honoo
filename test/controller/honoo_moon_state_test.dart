@@ -17,6 +17,7 @@ void main() {
 
   setUp(() {
     harness = SupabaseTestHarness(withAuthenticatedUser: true);
+    harness.stubTable('users');
     harness.enableOverrides();
   });
 

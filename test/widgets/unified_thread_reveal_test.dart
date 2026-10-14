@@ -498,7 +498,7 @@ void main() {
   });
 
   testWidgets(
-    'una risposta ricevuta mostra in rosso l’Honoo salvato dalla Luna',
+    'una risposta ricevuta mantiene bianco l’Honoo salvato dalla Luna',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(600, 900);
@@ -547,14 +547,14 @@ void main() {
         tester
             .widget<ColoredBox>(find.byKey(const Key('reply_reveal_parent')))
             .color,
-        HonooColor.secondary,
+        HonooColor.tertiary,
       );
       expect(borderWithColor(HonooColor.secondary), findsNothing);
     },
   );
 
   testWidgets(
-    'una risposta ricevuta mostra in rosso l’Hinoo salvato dalla Luna',
+    'una risposta ricevuta mantiene bianco l’Hinoo salvato dalla Luna',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(600, 900);
@@ -601,7 +601,7 @@ void main() {
         tester
             .widget<ColoredBox>(find.byKey(const Key('reply_reveal_parent')))
             .color,
-        HonooColor.secondary,
+        HonooColor.tertiary,
       );
     },
   );
