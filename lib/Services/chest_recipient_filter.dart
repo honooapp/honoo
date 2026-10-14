@@ -10,7 +10,7 @@ Future<String> chestRecipientFilter(
   final rows = await client
       .from('users')
       .select('address')
-      .eq('auth_id', userId);
+      .eq('auth_user_id', userId);
   final identities = <String>{userId};
   for (final row in rows) {
     final address = row['address']?.toString();

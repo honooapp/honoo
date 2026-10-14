@@ -151,7 +151,7 @@ void main() {
     ).called(1);
     verify(() => honoo.or(recipient)).called(1);
     verify(() => hinoo.or(recipient)).called(1);
-    verify(() => users.eq('auth_id', 'user-1')).called(3);
+    verify(() => users.eq('auth_user_id', 'user-1')).called(3);
   });
 
   test('deleteHinoo elimina esclusivamente la riga indicata', () async {

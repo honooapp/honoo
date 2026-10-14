@@ -32,9 +32,20 @@ try {
     insert into public."case" values ('${owner}', '${house}');
     insert into public.honoo values ('${content}', '${visitor}', '${house}', 'Bussata', 'https://example.test/honoo.png', '2026-01-01');
     insert into public.hinoo values ('${content}', '${visitor}', '${house}', '[{"text":"Bussata hinoo","backgroundImage":"https://example.test/hinoo.png"}]', '2026-01-02');
+    insert into public."case" values ('${owner}', '00000000-0000-0000-0000-000000000099');
+    insert into public.house_access (id, visitor_id, target_house_tag, share_modes, granted_at)
+      values (999, '${visitor}', '00000000-0000-0000-0000-000000000099', array['home','moon'], '2026-01-01');
   `);
   await db.exec(await readFile(new URL('../supabase/migrations/20261013120000_house_guests_permissions.sql', import.meta.url), 'utf8'));
   await db.exec(await readFile(new URL('../supabase/migrations/20261013150000_house_guest_first_content.sql', import.meta.url), 'utf8'));
+  await login(owner);
+  await db.exec('set role authenticated');
+  const legacyGuests = (await db.query('select * from public.get_house_guests($1)', ['00000000-0000-0000-0000-000000000099'])).rows;
+  assert.equal(legacyGuests.length, 1, 'existing approvals without content must survive the migrations');
+  assert.deepEqual(legacyGuests[0].share_modes, ['home', 'moon']);
+  assert.equal(legacyGuests[0].honoo, null);
+  assert.equal(legacyGuests[0].hinoo, null);
+  await db.exec('reset role');
   await login(visitor);
   await db.exec('set role authenticated');
   const insert = (extra = '', values = '') => db.exec(`insert into public.house_access(visitor_id,target_house_tag${extra}) values ('${visitor}','${house}'${values})`);
