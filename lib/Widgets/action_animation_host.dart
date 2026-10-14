@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../Services/action_animation.dart';
+import '../Utility/honoo_colors.dart';
 
 /// Lives above the entire app, including dialogs and safe-area padding.
 class ActionAnimationHost extends StatefulWidget {
@@ -140,7 +141,7 @@ class _ActionAnimationHostState extends State<ActionAnimationHost> {
             Positioned.fill(
               child: AbsorbPointer(
                 child: ColoredBox(
-                  color: Colors.black,
+                  color: HonooColor.background,
                   child: Center(
                     child: FittedBox(
                       fit: BoxFit.contain,
@@ -157,7 +158,7 @@ class _ActionAnimationHostState extends State<ActionAnimationHost> {
           if (_retryWithAudio != null)
             Positioned.fill(
               child: Material(
-                color: Colors.black87,
+                color: HonooColor.background,
                 child: SafeArea(
                   child: Center(
                     child: Column(
