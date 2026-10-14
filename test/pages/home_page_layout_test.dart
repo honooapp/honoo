@@ -120,6 +120,27 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  for (final size in const [Size(320, 500), Size(1440, 1000)]) {
+    testWidgets('casa sopra l isola e accessi distinti a $size', (
+      tester,
+    ) async {
+      await pumpHomeAtSize(tester, size);
+      final house = find.byKey(const Key('home_house_entry'));
+      final island = find.byKey(const Key('footer_island_entry'));
+      expect(house.hitTestable(), findsOneWidget);
+      expect(island.hitTestable(), findsOneWidget);
+      final houseRect = tester.getRect(house);
+      final islandRect = tester.getRect(island);
+      expect(houseRect.center.dx, islandRect.center.dx);
+      // The wide island SVG is centered inside its historical square button.
+      final islandImageTop = islandRect.center.dy - (180 * 15 / 62) / 2;
+      expect(houseRect.bottom, lessThan(islandImageTop));
+      expect(houseRect.left, greaterThanOrEqualTo(0));
+      expect(houseRect.right, lessThanOrEqualTo(size.width));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('l icona casa apre l invito per chi non ha casa', (tester) async {
     final rpc = MockQueryChain()..queueResponse(const []);
     when(

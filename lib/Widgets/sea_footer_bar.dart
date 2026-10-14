@@ -38,7 +38,10 @@ class SeaFooterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: height,
+      // Include the house button in the hit-test area above the existing sea.
+      height: showHouseEntry
+          ? height + 65 + MediaQuery.of(context).viewPadding.bottom
+          : height,
       width: double.infinity,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -133,13 +136,51 @@ class SeaFooterBar extends StatelessWidget {
               ),
 
               // Isola (sx)
+              Positioned(
+                bottom: safeBottom,
+                left: islandX,
+                child: Transform.translate(
+                  offset: const Offset(0, height * 0.15),
+                  child: IconButton(
+                    constraints: const BoxConstraints.tightFor(
+                      width: islandSize,
+                      height: islandSize,
+                    ),
+                    key: const Key('footer_island_entry'),
+                    padding: EdgeInsets.zero,
+                    icon: SvgPicture.asset(
+                      "assets/icons/isoladellestorie/island.svg",
+                      theme: const SvgTheme(
+                        currentColor: HonooColor.onBackground,
+                      ),
+                      colorFilter: const ColorFilter.mode(
+                        HonooColor.onBackground,
+                        BlendMode.srcIn,
+                      ),
+                      width: islandSize,
+                      height: islandSize,
+                      semanticsLabel: 'Island',
+                    ),
+                    iconSize: islandSize,
+                    splashRadius: 1,
+                    tooltip: "Vai all'Isola delle Storie",
+                    onPressed: () => SeaFooterBar.openIsland(context),
+                  ),
+                ),
+              ),
+
               if (showHouseEntry)
                 Positioned(
-                  bottom: safeBottom + 16,
-                  left: islandX + 16,
+                  bottom: safeBottom + height,
+                  left: islandX + (islandSize - 55) / 2,
                   child: IconButton(
                     key: const Key('home_house_entry'),
                     tooltip: 'La tua casa',
+                    constraints: const BoxConstraints.tightFor(
+                      width: 55,
+                      height: 55,
+                    ),
+                    padding: EdgeInsets.zero,
                     iconSize: 55,
                     icon: SvgPicture.asset(
                       'assets/icons/ospiti.svg',
@@ -152,38 +193,6 @@ class SeaFooterBar extends StatelessWidget {
                         builder: (_) =>
                             const CampanelliPage(openOwnHouse: true),
                       ),
-                    ),
-                  ),
-                ),
-              if (!showHouseEntry)
-                Positioned(
-                  bottom: safeBottom,
-                  left: islandX,
-                  child: Transform.translate(
-                    offset: const Offset(0, height * 0.15),
-                    child: IconButton(
-                      constraints: const BoxConstraints.tightFor(
-                        width: islandSize,
-                        height: islandSize,
-                      ),
-                      padding: EdgeInsets.zero,
-                      icon: SvgPicture.asset(
-                        "assets/icons/isoladellestorie/island.svg",
-                        theme: const SvgTheme(
-                          currentColor: HonooColor.onBackground,
-                        ),
-                        colorFilter: const ColorFilter.mode(
-                          HonooColor.onBackground,
-                          BlendMode.srcIn,
-                        ),
-                        width: islandSize,
-                        height: islandSize,
-                        semanticsLabel: 'Island',
-                      ),
-                      iconSize: islandSize,
-                      splashRadius: 1,
-                      tooltip: "Vai all'Isola delle Storie",
-                      onPressed: () => SeaFooterBar.openIsland(context),
                     ),
                   ),
                 ),
