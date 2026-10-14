@@ -350,6 +350,27 @@ class _WidthLimitedMultilineFieldState
           onEditingComplete: widget.onEditingComplete,
           onSubmitted: widget.onSubmitted,
           autofillHints: widget.autofillHints,
+          contextMenuBuilder: (context, editableText) {
+            final items = editableText.contextMenuButtonItems
+                .where((item) => item.type != ContextMenuButtonType.paste)
+                .toList();
+            if (!widget.readOnly && widget.enabled != false) {
+              // Read the clipboard on the user's gesture, including browsers
+              // that cannot report clipboard availability ahead of time.
+              items.add(
+                ContextMenuButtonItem(
+                  type: ContextMenuButtonType.paste,
+                  label: 'Incolla',
+                  onPressed: () =>
+                      editableText.pasteText(SelectionChangedCause.toolbar),
+                ),
+              );
+            }
+            return AdaptiveTextSelectionToolbar.buttonItems(
+              anchors: editableText.contextMenuAnchors,
+              buttonItems: items,
+            );
+          },
         );
         if (!widget.enableInlineFormatting ||
             widget.readOnly ||

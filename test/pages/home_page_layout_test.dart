@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:honoo/Pages/home_page.dart';
+import 'package:honoo/IsolaDelleStorie/Pages/campanelli_page.dart';
 import 'package:honoo/Pages/placeholder_page.dart';
 import 'package:honoo/Services/home_service.dart';
 import 'package:honoo/Utility/reply_notification_signal.dart';
@@ -117,6 +118,25 @@ void main() {
     expect(find.byType(Scrollable), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('l icona casa apre l invito per chi non ha casa', (tester) async {
+    final rpc = MockQueryChain()..queueResponse(const []);
+    when(
+      () => harness.client.rpc('get_public_admin_campanelli'),
+    ).thenAnswer((_) => rpc);
+    await pumpHomeAtSize(tester, const Size(320, 600));
+    await tester.tap(find.byKey(const Key('home_house_entry')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<CampanelliPage>(find.byType(CampanelliPage)).openOwnHouse,
+      isTrue,
+    );
+    expect(
+      find.textContaining('Vuoi anche tu', findRichText: true),
+      findsOneWidget,
+    );
+    expect(find.text('Clicca qui'), findsOneWidget);
   });
 
   testWidgets("la scritta honoo apre la placeholder page", (tester) async {

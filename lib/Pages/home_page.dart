@@ -141,7 +141,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
 
                   // FOOTER sostituito col widget riutilizzabile
-                  SeaFooterBar(replyCount: _replyCount),
+                  SeaFooterBar(replyCount: _replyCount, showHouseEntry: true),
                 ],
               ),
 

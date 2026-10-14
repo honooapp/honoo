@@ -102,6 +102,75 @@ void main() {
     expect(InlineTextFormatting.visibleText(both.text), selected.text);
   });
 
+  for (final maxLines in [5, 20]) {
+    testWidgets(
+      'Incolla inserisce e sostituisce testo rispettando $maxLines righe',
+      (tester) async {
+        final controller = TextEditingController(text: 'Ciao Luna');
+        addTearDown(controller.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 400,
+                height: 300,
+                child: WidthLimitedMultilineField(
+                  controller: controller,
+                  style: const TextStyle(fontSize: 18),
+                  maxLines: maxLines,
+                  maxCharsPerLine: 32,
+                  enableInlineFormatting: true,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.byType(TextField));
+        await tester.pump();
+        controller.selection = const TextSelection(
+          baseOffset: 5,
+          extentOffset: 9,
+        );
+        final editable = tester.state<EditableTextState>(
+          find.byType(EditableText),
+        );
+        final field = tester.widget<TextField>(find.byType(TextField));
+        final toolbar =
+            field.contextMenuBuilder!(
+                  tester.element(find.byType(TextField)),
+                  editable,
+                )
+                as AdaptiveTextSelectionToolbar;
+        final paste = toolbar.buttonItems!.singleWhere(
+          (item) => item.label == 'Incolla',
+        );
+        var clipboardText = 'Isola';
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          (call) async {
+            if (call.method == 'Clipboard.getData')
+              return {'text': clipboardText};
+            if (call.method == 'Clipboard.hasStrings') return {'value': true};
+            return null;
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            SystemChannels.platform,
+            null,
+          ),
+        );
+        paste.onPressed!();
+        await tester.pump();
+        expect(controller.text, 'Ciao Isola');
+        clipboardText = List.filled(maxLines + 1, 'riga').join('\n');
+        paste.onPressed!();
+        await tester.pump();
+        expect(controller.text, 'Ciao Isola');
+      },
+    );
+  }
+
   testWidgets('i tasti C e B formattano la selezione', (tester) async {
     final controller = FormattedTextEditingController(text: 'Una parola');
     final focusNode = FocusNode();

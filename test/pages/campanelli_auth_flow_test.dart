@@ -295,6 +295,46 @@ void main() {
     },
   );
 
+  testWidgets('dalla home apre direttamente la propria casa con lo Scrigno', (
+    tester,
+  ) async {
+    harness.disableOverrides();
+    harness = SupabaseTestHarness(withAuthenticatedUser: true)
+      ..enableOverrides();
+    harness.stubTable('case').queueResponse(const [
+      {
+        'campanello_hinoo_id': 'owned',
+        'owner_id': 'test_user',
+        'house_text': 'La mia casa',
+      },
+    ]);
+    harness.stubTable('house_share_settings').queueResponse(const []);
+    harness.stubTable('hinoo').queueResponse(const [
+      {
+        'id': 'owned',
+        'pages': [
+          {'text': 'Il mio campanello'},
+        ],
+      },
+    ]);
+    final access = harness.stubTable('house_access');
+    when(() => access.not('granted_at', 'is', null)).thenAnswer((_) => access);
+    access
+      ..queueResponse(const [])
+      ..queueResponse(const []);
+    harness.stubTable('house_invites').queueResponse(const []);
+    await tester.pumpWidget(
+      const MaterialApp(home: CampanelliPage(openOwnHouse: true)),
+    );
+    await tester.pumpAndSettle();
+    final casa = tester.widget<CasaSection>(find.byType(CasaSection));
+    expect(casa.isUnlocked, isTrue);
+    expect(casa.onGuestsTap, isNotNull);
+    expect(casa.onScrignoTap, isNotNull);
+    expect(find.byKey(const ValueKey('house-chest')), findsOneWidget);
+    expect(find.text('Clicca qui'), findsNothing);
+  });
+
   testWidgets('dopo la modifica della casa resta sul campanello selezionato', (
     tester,
   ) async {

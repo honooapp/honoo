@@ -48,7 +48,9 @@ import 'pending_hinoo_page.dart';
 import 'pending_honoo_page.dart';
 
 class CampanelliPage extends StatefulWidget {
-  const CampanelliPage({super.key});
+  const CampanelliPage({super.key, this.openOwnHouse = false});
+
+  final bool openOwnHouse;
 
   @override
   State<CampanelliPage> createState() => _CampanelliPageState();
@@ -73,6 +75,7 @@ class _CampanelliPageState extends State<CampanelliPage>
   final PageController _campanelloPageController = PageController();
   List<_CampanelloEntry> _userEntries = const [];
   bool _isLoadingUserEntries = false;
+  bool _initialHouseDestinationHandled = false;
   bool _isPageNavigationLocked = false;
   DateTime _ignorePageNavigationUntil = DateTime.fromMillisecondsSinceEpoch(0);
   Offset? _desktopDragStart;
@@ -711,7 +714,11 @@ class _CampanelliPageState extends State<CampanelliPage>
     List<_CampanelloEntry> campanelli,
   ) {
     final pages = <CampanelloPageData>[
-      CampanelloPageData.intro(Utility().campanelliText),
+      CampanelloPageData.intro(
+        widget.openOwnHouse
+            ? 'Vuoi anche tu\nla tua casa sull’Isola?\n\n\nClicca qui'
+            : Utility().campanelliText,
+      ),
       for (final campanello in campanelli)
         CampanelloPageData.campanello(campanello.campanello),
     ];
@@ -830,7 +837,17 @@ class _CampanelliPageState extends State<CampanelliPage>
         final previousEntryIndex = sortedEntries.indexWhere(
           (entry) => entry.campanello.id == previousCampanelloId,
         );
-        final targetPage = previousCampanelloId == null
+        final ownEntryIndex = sortedEntries.indexWhere(
+          (entry) => entry.campanello.ownerId == user.id,
+        );
+        final openOwnHouse =
+            widget.openOwnHouse &&
+            !_initialHouseDestinationHandled &&
+            ownEntryIndex >= 0;
+        _initialHouseDestinationHandled = true;
+        final targetPage = openOwnHouse
+            ? ownEntryIndex + 1
+            : previousCampanelloId == null
             ? 0
             : previousEntryIndex >= 0
             ? previousEntryIndex + 1
@@ -857,6 +874,9 @@ class _CampanelliPageState extends State<CampanelliPage>
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || !_campanelloPageController.hasClients) return;
           _campanelloPageController.jumpToPage(targetPage);
+          if (openOwnHouse && _pageController.hasClients) {
+            _pageController.jumpToPage(1);
+          }
         });
       }
       // Verifica inviti pendenti/accettati per nascondere CTA se già invitato

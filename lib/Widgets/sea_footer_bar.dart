@@ -7,13 +7,19 @@ import 'package:honoo/Widgets/composer_onboarding.dart';
 // Pagine per la navigazione (come in HomePage)
 import 'package:honoo/IsolaDelleStorie/Pages/island_page.dart';
 import 'package:honoo/Pages/chest_page.dart';
+import 'package:honoo/IsolaDelleStorie/Pages/campanelli_page.dart';
 
 /// Barra “mare” riutilizzabile con onde + isola (sx) + scrigno (centro) + bottiglia (dx)
 /// Posizioni, dimensioni e z-order identici alla HomePage.
 class SeaFooterBar extends StatelessWidget {
-  const SeaFooterBar({super.key, this.replyCount = 0});
+  const SeaFooterBar({
+    super.key,
+    this.replyCount = 0,
+    this.showHouseEntry = false,
+  });
 
   final int replyCount;
+  final bool showHouseEntry;
 
   /// Altezza fissa come in HomePage
   static const double height = 105;
@@ -127,37 +133,60 @@ class SeaFooterBar extends StatelessWidget {
               ),
 
               // Isola (sx)
-              Positioned(
-                bottom: safeBottom,
-                left: islandX,
-                child: Transform.translate(
-                  offset: const Offset(0, height * 0.15),
+              if (showHouseEntry)
+                Positioned(
+                  bottom: safeBottom + 16,
+                  left: islandX + 16,
                   child: IconButton(
-                    constraints: const BoxConstraints.tightFor(
-                      width: islandSize,
-                      height: islandSize,
-                    ),
-                    padding: EdgeInsets.zero,
+                    key: const Key('home_house_entry'),
+                    tooltip: 'La tua casa',
+                    iconSize: 55,
                     icon: SvgPicture.asset(
-                      "assets/icons/isoladellestorie/island.svg",
-                      theme: const SvgTheme(
-                        currentColor: HonooColor.onBackground,
-                      ),
-                      colorFilter: const ColorFilter.mode(
-                        HonooColor.onBackground,
-                        BlendMode.srcIn,
-                      ),
-                      width: islandSize,
-                      height: islandSize,
-                      semanticsLabel: 'Island',
+                      'assets/icons/ospiti.svg',
+                      width: 55,
+                      height: 55,
+                      semanticsLabel: 'La tua casa',
                     ),
-                    iconSize: islandSize,
-                    splashRadius: 1,
-                    tooltip: "Vai all'Isola delle Storie",
-                    onPressed: () => SeaFooterBar.openIsland(context),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const CampanelliPage(openOwnHouse: true),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              if (!showHouseEntry)
+                Positioned(
+                  bottom: safeBottom,
+                  left: islandX,
+                  child: Transform.translate(
+                    offset: const Offset(0, height * 0.15),
+                    child: IconButton(
+                      constraints: const BoxConstraints.tightFor(
+                        width: islandSize,
+                        height: islandSize,
+                      ),
+                      padding: EdgeInsets.zero,
+                      icon: SvgPicture.asset(
+                        "assets/icons/isoladellestorie/island.svg",
+                        theme: const SvgTheme(
+                          currentColor: HonooColor.onBackground,
+                        ),
+                        colorFilter: const ColorFilter.mode(
+                          HonooColor.onBackground,
+                          BlendMode.srcIn,
+                        ),
+                        width: islandSize,
+                        height: islandSize,
+                        semanticsLabel: 'Island',
+                      ),
+                      iconSize: islandSize,
+                      splashRadius: 1,
+                      tooltip: "Vai all'Isola delle Storie",
+                      onPressed: () => SeaFooterBar.openIsland(context),
+                    ),
+                  ),
+                ),
 
               // Scrigno (centro)
               Positioned(
