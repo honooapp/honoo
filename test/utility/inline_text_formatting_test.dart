@@ -148,8 +148,9 @@ void main() {
         tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
           SystemChannels.platform,
           (call) async {
-            if (call.method == 'Clipboard.getData')
+            if (call.method == 'Clipboard.getData') {
               return {'text': clipboardText};
+            }
             if (call.method == 'Clipboard.hasStrings') return {'value': true};
             return null;
           },
