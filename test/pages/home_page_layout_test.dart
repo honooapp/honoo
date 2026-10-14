@@ -55,7 +55,7 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('mostra il nuovo testo e le azioni inline senza scroll', (
+  testWidgets('mantiene testo e azioni inline senza ridurre il carattere', (
     tester,
   ) async {
     await pumpHomeAtSize(tester, const Size(320, 500));
@@ -73,7 +73,13 @@ void main() {
     );
     expect(islandFollowupTransform.transform.getTranslation().y, -2);
     expect(find.textContaining('e vedi tutto'), findsOneWidget);
-    expect(find.byType(Scrollable), findsNothing);
+    expect(find.byKey(const Key('home_intro_scroll')), findsOneWidget);
+    expect(tester.widget<Text>(intro).textSpan!.style!.fontSize, 18);
+    expect(
+      find.ancestor(of: intro, matching: find.byType(FittedBox)),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
     expect(find.byKey(const Key('home_inline_bottle')), findsOneWidget);
     expect(find.byKey(const Key('home_inline_moon')), findsOneWidget);
     expect(find.byKey(const Key('home_inline_island')), findsOneWidget);
@@ -115,7 +121,13 @@ void main() {
     await pumpHomeAtSize(tester, const Size(1440, 1000));
 
     expect(find.byKey(const Key('home_intro_text')), findsOneWidget);
-    expect(find.byType(Scrollable), findsNothing);
+    expect(find.byKey(const Key('home_intro_scroll')), findsOneWidget);
+    expect(tester.widget<Text>(intro).textSpan!.style!.fontSize, 18);
+    expect(
+      find.ancestor(of: intro, matching: find.byType(FittedBox)),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -163,6 +175,8 @@ void main() {
   testWidgets("la scritta honoo apre la placeholder page", (tester) async {
     await pumpHomeAtSize(tester, const Size(320, 600));
 
+    await tester.ensureVisible(find.byKey(const Key('home_inline_honoo')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('home_inline_honoo')));
     await tester.pumpAndSettle();
 

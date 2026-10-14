@@ -18,7 +18,6 @@ class ActionAnimationHost extends StatefulWidget {
 class _ActionAnimationHostState extends State<ActionAnimationHost> {
   VideoPlayerController? _controller;
   Completer<void>? _completion;
-  VoidCallback? _retryWithAudio;
   Size _videoSize = Size.zero;
   Future<void> _queue = Future<void>.value();
   late final Future<void> Function(ActionAnimation) _presenter = _enqueue;
@@ -53,19 +52,19 @@ class _ActionAnimationHostState extends State<ActionAnimationHost> {
         return;
       }
       if (!mounted || completion.isCompleted) return;
-      setState(() {
-        _retryWithAudio = () {
-          retried = true;
-          watchdog?.cancel();
-          watchdog = Timer(const Duration(seconds: 30), finish);
-          setState(() => _retryWithAudio = null);
-          // The web plugin replaces the value on an autoplay rejection, even
-          // though the underlying video is still loaded. Restore it so play()
-          // reaches that same video synchronously inside the user's gesture.
-          controller.value = ready;
-          unawaited(controller.play().catchError((Object _) => finish()));
-        };
-      });
+      retried = true;
+      // Restore the initialized value discarded by the web plugin on rejection.
+      // Muted autoplay needs no additional user gesture or overlay.
+      controller.value = ready;
+      unawaited(() async {
+        try {
+          await controller.setVolume(0);
+          if (!mounted || completion.isCompleted) return;
+          await controller.play();
+        } catch (_) {
+          finish();
+        }
+      }());
     }
 
     void listen() {
@@ -103,7 +102,6 @@ class _ActionAnimationHostState extends State<ActionAnimationHost> {
       if (mounted) {
         setState(() {
           _controller = null;
-          _retryWithAudio = null;
         });
       }
       _completion = null;
@@ -150,35 +148,6 @@ class _ActionAnimationHostState extends State<ActionAnimationHost> {
                         height: _videoSize.height,
                         child: VideoPlayer(controller),
                       ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          if (_retryWithAudio != null)
-            Positioned.fill(
-              child: Material(
-                color: HonooColor.background,
-                child: SafeArea(
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        FilledButton.icon(
-                          onPressed: _retryWithAudio,
-                          icon: const Icon(Icons.volume_up),
-                          label: const Text('Riproduci con audio'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            final completion = _completion;
-                            if (completion != null && !completion.isCompleted) {
-                              completion.complete();
-                            }
-                          },
-                          child: const Text('Continua'),
-                        ),
-                      ],
                     ),
                   ),
                 ),

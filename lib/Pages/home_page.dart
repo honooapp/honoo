@@ -176,10 +176,8 @@ class _HomeIntro extends StatelessWidget {
       fontWeight: FontWeight.w400,
     );
 
-    return FittedBox(
-      key: const Key('home_intro_fitted'),
-      fit: BoxFit.scaleDown,
-      alignment: Alignment.topCenter,
+    return SingleChildScrollView(
+      key: const Key('home_intro_scroll'),
       child: SizedBox(
         width: _designWidth,
         child: Text.rich(

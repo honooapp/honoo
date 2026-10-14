@@ -11,6 +11,7 @@ class _Player extends VideoPlayerPlatform {
   final assets = <String?>[];
   bool fail = false;
   bool blockAutoplay = false;
+  bool blockMutedPlayback = false;
   final volumes = <int, double>{};
   final playCalls = <int>[];
   @override
@@ -46,7 +47,7 @@ class _Player extends VideoPlayerPlatform {
   @override
   Future<void> play(int playerId) async {
     playCalls.add(playerId);
-    if (blockAutoplay) {
+    if (blockAutoplay && (volumes[playerId] != 0 || blockMutedPlayback)) {
       streams[playerId]!.addError(
         PlatformException(code: 'NotAllowedError', message: 'Autoplay blocked'),
       );
@@ -160,7 +161,7 @@ void main() {
   });
 
   for (final size in [const Size(320, 640), const Size(1440, 900)]) {
-    testWidgets('audio can resume after autoplay rejection at $size', (
+    testWidgets('blocked autoplay retries muted without a prompt at $size', (
       tester,
     ) async {
       tester.view.physicalSize = size;
@@ -176,15 +177,11 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(done, isFalse);
-      expect(find.text('Riproduci con audio'), findsOneWidget);
-      expect(player.volumes[0], 1);
-      expect(tester.getSize(find.byType(AbsorbPointer).last), size);
-      player.blockAutoplay = false;
-      await tester.tap(find.text('Riproduci con audio'));
-      await tester.pump();
-      expect(player.playCalls, [0, 0]);
+      expect(find.byType(FilledButton), findsNothing);
       expect(find.text('Riproduci con audio'), findsNothing);
-      expect(done, isFalse);
+      expect(player.volumes[0], 0);
+      expect(player.playCalls, [0, 0]);
+      expect(tester.getSize(find.byType(AbsorbPointer).last), size);
       player.streams[0]!.add(VideoEvent(eventType: VideoEventType.completed));
       await tester.pump(const Duration(milliseconds: 100));
       expect(done, isTrue);
@@ -192,24 +189,19 @@ void main() {
     });
   }
 
-  for (final retry in [false, true]) {
-    testWidgets('blocked audio releases navigation (retry: $retry)', (
-      tester,
-    ) async {
-      player.blockAutoplay = true;
-      await tester.pumpWidget(
-        const ActionAnimationHost(child: MaterialApp(home: Text('page'))),
-      );
-      var done = false;
-      ActionAnimations.play(ActionAnimation.device).then((_) => done = true);
-      await tester.pump();
-      await tester.pump();
-      await tester.tap(find.text(retry ? 'Riproduci con audio' : 'Continua'));
-      await tester.pump();
-      await tester.pump();
-      expect(done, isTrue);
-      expect(find.text('Riproduci con audio'), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
-  }
+  testWidgets('failed muted retry releases navigation', (tester) async {
+    player.blockAutoplay = true;
+    player.blockMutedPlayback = true;
+    await tester.pumpWidget(
+      const ActionAnimationHost(child: MaterialApp(home: Text('page'))),
+    );
+    var done = false;
+    ActionAnimations.play(ActionAnimation.device).then((_) => done = true);
+    await tester.pump();
+    await tester.pump();
+    expect(done, isTrue);
+    expect(player.playCalls, [0, 0]);
+    expect(find.byType(FittedBox), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }
