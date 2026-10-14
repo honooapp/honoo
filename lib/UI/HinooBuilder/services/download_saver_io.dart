@@ -59,7 +59,13 @@ class _DownloadSaverIo implements DownloadSaver {
             ),
           )
           .toList(growable: false);
-      await Share.shareXFiles(files, text: message ?? '');
+      final shared = await Share.shareXFiles(files, text: message ?? '');
+      if (shared.status == ShareResultStatus.dismissed) {
+        return const DownloadSaveResult(
+          message: 'Salvataggio annullato.',
+          cancelled: true,
+        );
+      }
       return const DownloadSaveResult(
         message: 'Condividi o salva le immagini dalle opzioni di sistema.',
       );

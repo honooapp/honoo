@@ -13,11 +13,13 @@ class DownloadSaveResult {
   const DownloadSaveResult({
     required this.message,
     this.savedToGallery = false,
+    this.cancelled = false,
     this.savedItemUri,
   });
 
   final String message;
   final bool savedToGallery;
+  final bool cancelled;
   final String? savedItemUri;
 }
 

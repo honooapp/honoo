@@ -1,3 +1,4 @@
+import 'action_animation.dart';
 import 'package:honoo/Services/supabase_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../Entities/honoo.dart';
@@ -38,6 +39,7 @@ class HonooService {
         .eq('user_id', userId)
         .select('id')
         .single();
+    await ActionAnimations.play(ActionAnimation.chest);
   }
 
   /// Honoo pubblici (Luna)
@@ -123,6 +125,7 @@ class HonooService {
     await _reliability.write(
       () async => await _client.from('honoo').insert(honoo.toInsertMap()),
     );
+    await ActionAnimations.forDestination(honoo.type.name);
   }
 
   static Future<String> publishHonooAndReturnId(Honoo honoo) async {
@@ -139,6 +142,7 @@ class HonooService {
     if (id.isEmpty) {
       throw Exception('publishHonoo: id mancante');
     }
+    await ActionAnimations.forDestination(honoo.type.name);
     return id;
   }
 
@@ -186,7 +190,11 @@ class HonooService {
       'fingerprint': fingerprint(h),
       if (h.isFromMoonSaved) 'is_from_moon_saved': true,
     };
-    return _insertDuplicate(payload);
+    final result = await _insertDuplicate(payload);
+    if (result == DuplicationResult.inserted) {
+      await ActionAnimations.forDestination(payload['destination'] as String);
+    }
+    return result;
   }
 
   /// Pubblica una nuova copia dell'honoo sulla Luna a ogni invio.
@@ -213,7 +221,11 @@ class HonooService {
       'user_id': uid,
       'fingerprint': fingerprint(h),
     };
-    return _insertDuplicate(payload);
+    final result = await _insertDuplicate(payload);
+    if (result == DuplicationResult.inserted) {
+      await ActionAnimations.forDestination(payload['destination'] as String);
+    }
+    return result;
   }
 
   static String fingerprint(Honoo h) => '${h.text}\u001f${h.image}';

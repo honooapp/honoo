@@ -1,3 +1,4 @@
+import 'action_animation.dart';
 import 'package:honoo/Services/supabase_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../Entities/hinoo.dart';
@@ -57,6 +58,7 @@ class HinooService {
         .eq('user_id', userId)
         .select('id')
         .single();
+    await ActionAnimations.play(ActionAnimation.chest);
   }
 
   static Future<void> publishHinoo(HinooDraft draft) async {
@@ -77,6 +79,7 @@ class HinooService {
 
     final res = await _insertPublished(data);
     if (res == null) throw 'publishHinoo: insert fallita';
+    await ActionAnimations.forDestination(draft.type.name);
   }
 
   static Future<String> publishHinooAndReturnId(HinooDraft draft) async {
@@ -99,6 +102,7 @@ class HinooService {
     if (res == null) throw 'publishHinoo: insert fallita';
     final id = res['id']?.toString() ?? '';
     if (id.isEmpty) throw 'publishHinoo: id mancante';
+    await ActionAnimations.forDestination(draft.type.name);
     return id;
   }
 
@@ -145,7 +149,11 @@ class HinooService {
       'is_from_moon_saved': false,
     };
 
-    return _insertDuplicate(data);
+    final result = await _insertDuplicate(data);
+    if (result == DuplicationResult.inserted) {
+      await ActionAnimations.forDestination(data['type'] as String);
+    }
+    return result;
   }
 
   static Future<DuplicationResult> duplicateMoonToChest(
@@ -171,7 +179,11 @@ class HinooService {
       'fingerprint': fp,
     };
 
-    return _insertDuplicate(data);
+    final result = await _insertDuplicate(data);
+    if (result == DuplicationResult.inserted) {
+      await ActionAnimations.forDestination(data['type'] as String);
+    }
+    return result;
   }
 
   static Future<DuplicationResult> _insertDuplicate(Map<String, dynamic> data) {

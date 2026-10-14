@@ -1,3 +1,4 @@
+import 'Widgets/action_animation_host.dart';
 import 'Widgets/activity_tracker.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
@@ -154,14 +155,16 @@ class _MyAppState extends State<MyApp> {
           home: const AuthGate(),
           routes: {'/chest': (context) => const ChestPage()},
         );
-        return GlobalReplyNotificationListener(
-          navigatorKey: _navigatorKey,
-          enabled: !isStorieStorieContinuation(Uri.base),
-          child: SafeArea(
-            child: GlobalInviteListener(
-              navigatorKey: _navigatorKey,
-              enabled: true,
-              child: ActivityTracker(child: app),
+        return ActionAnimationHost(
+          child: GlobalReplyNotificationListener(
+            navigatorKey: _navigatorKey,
+            enabled: !isStorieStorieContinuation(Uri.base),
+            child: SafeArea(
+              child: GlobalInviteListener(
+                navigatorKey: _navigatorKey,
+                enabled: true,
+                child: ActivityTracker(child: app),
+              ),
             ),
           ),
         );

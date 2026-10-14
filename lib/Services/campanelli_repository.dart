@@ -1,3 +1,4 @@
+import 'action_animation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_provider.dart';
@@ -152,6 +153,7 @@ class CampanelliDataRepository {
         if (honooId != null && honooId.isNotEmpty) 'honoo_id': honooId,
       }),
     );
+    await ActionAnimations.play(ActionAnimation.elsewhere);
   }
 
   Future<void> saveShareModes({

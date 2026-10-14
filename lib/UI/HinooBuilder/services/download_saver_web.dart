@@ -18,7 +18,16 @@ class _DownloadSaverWeb implements DownloadSaver {
       );
     }
 
-    if (_isMobileOrTabletBrowser() && await _shareWithSystem(images, message)) {
+    final shared = _isMobileOrTabletBrowser()
+        ? await _shareWithSystem(images, message)
+        : false;
+    if (shared == null) {
+      return const DownloadSaveResult(
+        message: 'Salvataggio annullato.',
+        cancelled: true,
+      );
+    }
+    if (shared) {
       return DownloadSaveResult(
         message: images.length == 1
             ? 'Scegli “Salva immagine” per aggiungerla alla galleria.'
@@ -94,7 +103,7 @@ bool _isMobileOrTabletBrowser() {
   );
 }
 
-Future<bool> _shareWithSystem(
+Future<bool?> _shareWithSystem(
   List<DownloadImage> images,
   String? message,
 ) async {
@@ -133,7 +142,7 @@ Future<bool> _shareWithSystem(
     try {
       final JSString? name = (error as JSObject).getProperty('name'.toJS);
       if (name?.toDart == 'AbortError') {
-        return true;
+        return null;
       }
     } catch (_) {}
     return false;
