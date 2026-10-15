@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -79,7 +78,7 @@ void main() {
     expect(intro, findsOneWidget);
     expect(find.textContaining('Ti regaliamo la Luna'), findsOneWidget);
     expect(
-      find.textContaining('È vero. Ma non per i poeti\nVuoi essere'),
+      find.textContaining('È vero. Ma non per i poeti\n\nVuoi essere'),
       findsOneWidget,
     );
     expect(find.byKey(const Key('home_island_followup_text')), findsOneWidget);
@@ -88,25 +87,17 @@ void main() {
     );
     expect(islandFollowupTransform.transform.getTranslation().y, -2);
     expect(find.textContaining('e vedi tutto'), findsOneWidget);
-    expect(find.byType(SingleChildScrollView), findsNothing);
-    final introRect = tester.getRect(intro);
-    expect(introRect.top, greaterThanOrEqualTo(52));
-    expect(
-      introRect.bottom,
-      lessThanOrEqualTo(tester.view.physicalSize.height - 100),
-    );
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
     expect(tester.widget<Text>(intro).textSpan!.style!.fontSize, 18);
-    final paragraph = tester.renderObject<RenderParagraph>(
-      find.descendant(of: intro, matching: find.byType(RichText)).first,
+    expect(tester.widget<Text>(intro).textSpan!.style!.height, 1.22);
+    await tester.drag(
+      find.byType(SingleChildScrollView),
+      const Offset(0, -600),
     );
-    final length = paragraph.text.toPlainText().length;
-    final boxes = paragraph.getBoxesForSelection(
-      TextSelection(baseOffset: length - 11, extentOffset: length),
-    );
-    expect(boxes, isNotEmpty);
+    await tester.pumpAndSettle();
     expect(
-      paragraph.localToGlobal(Offset(0, boxes.last.bottom)).dy,
-      lessThanOrEqualTo(tester.getRect(find.byType(SeaFooterBar)).top),
+      find.byKey(const Key('home_inline_honoo')).hitTestable(),
+      findsOneWidget,
     );
     expect(
       find.ancestor(of: intro, matching: find.byType(FittedBox)),
@@ -154,7 +145,7 @@ void main() {
     await pumpHomeAtSize(tester, const Size(1440, 1000));
 
     expect(find.byKey(const Key('home_intro_text')), findsOneWidget);
-    expect(find.byType(SingleChildScrollView), findsNothing);
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
     final desktopIntroRect = tester.getRect(intro);
     expect(desktopIntroRect.top, greaterThanOrEqualTo(52));
     expect(

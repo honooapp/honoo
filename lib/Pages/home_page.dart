@@ -137,7 +137,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           padding: EdgeInsets.symmetric(
                             horizontal: compact ? 4 : 16,
                           ),
-                          child: _HomeIntro(compact: compact),
+                          child: const SingleChildScrollView(
+                            child: _HomeIntro(),
+                          ),
                         ),
                       ),
                     ),
@@ -159,9 +161,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 }
 
 class _HomeIntro extends StatelessWidget {
-  const _HomeIntro({required this.compact});
-
-  final bool compact;
+  const _HomeIntro();
 
   static const double _designWidth = 360;
   static const double _bottleIconSize = 42;
@@ -177,11 +177,11 @@ class _HomeIntro extends StatelessWidget {
     final regularStyle = GoogleFonts.arvo(
       color: HonooColor.onBackground,
       fontSize: 18,
-      height: compact ? 1.0 : 1.22,
+      height: 1.22,
       fontWeight: FontWeight.w400,
     );
 
-    final gap = compact ? '\n' : '\n\n';
+    const gap = '\n\n';
     return SizedBox(
       width: _designWidth,
       child: Text.rich(
@@ -192,7 +192,7 @@ class _HomeIntro extends StatelessWidget {
               text: 'Ti regaliamo la Luna\nPer sempre$gap',
               style: regularStyle.copyWith(fontWeight: FontWeight.w700),
             ),
-            TextSpan(
+            const TextSpan(
               text:
                   'Niente è per sempre\n'
                   'E nessuno può regalarti la Luna$gap'
@@ -211,7 +211,7 @@ class _HomeIntro extends StatelessWidget {
               tooltip: 'Scrivi',
               onPressed: () => SeaFooterBar.openComposer(context),
             ),
-            TextSpan(text: '${gap}Oppure'),
+            const TextSpan(text: '${gap}Oppure'),
             const WidgetSpan(
               child: SizedBox(key: Key('home_moon_leading_gap'), width: 8),
             ),
@@ -223,7 +223,7 @@ class _HomeIntro extends StatelessWidget {
               tooltip: 'Vai sulla Luna',
               onPressed: () => LunaFissa.openMoon(context),
             ),
-            TextSpan(text: '\ne guarda le vite degli altri${gap}O'),
+            const TextSpan(text: '\ne guarda le vite degli altri${gap}O'),
             const WidgetSpan(
               child: SizedBox(key: Key('home_island_leading_gap'), width: 8),
             ),
@@ -250,7 +250,7 @@ class _HomeIntro extends StatelessWidget {
                 ),
               ),
             ),
-            TextSpan(text: '${gap}O'),
+            const TextSpan(text: '${gap}O'),
             const WidgetSpan(
               child: SizedBox(key: Key('home_honoo_leading_gap'), width: 8),
             ),
