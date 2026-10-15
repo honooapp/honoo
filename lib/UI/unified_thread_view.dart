@@ -27,6 +27,7 @@ class UnifiedThreadView extends StatefulWidget {
     required this.maxWidth,
     required this.maxHeight,
     this.onSelect,
+    this.onReveal,
     this.highlightLatest = false,
     this.isActive = false,
     this.onDownloadTap,
@@ -42,6 +43,7 @@ class UnifiedThreadView extends StatefulWidget {
   final double maxWidth;
   final double maxHeight;
   final ValueChanged<ConversationEntry>? onSelect;
+  final ValueChanged<ConversationEntry?>? onReveal;
   final bool highlightLatest;
   final bool isActive;
   final VoidCallback? onDownloadTap;
@@ -117,6 +119,22 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
         weight: 36,
       ),
     ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _controller.addStatusListener((status) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            !widget.isActive ||
+            _entries.isEmpty ||
+            _missingNotificationTarget) {
+          return;
+        }
+        final entry = _entries.reversed.elementAt(
+          _currentPageIndex.clamp(0, _entries.length - 1),
+        );
+        widget.onReveal?.call(
+          _controller.isAnimating ? _answeredEntryFor(entry) : null,
+        );
+      });
+    });
     _load();
     _syncSubscription();
   }
@@ -345,12 +363,21 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
     }
   }
 
+  bool get _missingNotificationTarget =>
+      (widget.revealEntryId?.isNotEmpty ?? false) &&
+      !_entries.any((entry) => entry.id == widget.revealEntryId);
+
   void _scheduleSelection() {
     if (_selectionScheduled) return;
     _selectionScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _selectionScheduled = false;
-      if (!mounted || !widget.isActive || _entries.isEmpty) return;
+      if (!mounted ||
+          !widget.isActive ||
+          _entries.isEmpty ||
+          _missingNotificationTarget) {
+        return;
+      }
       final entry = _entries.reversed.elementAt(
         _currentPageIndex.clamp(0, _entries.length - 1),
       );
@@ -376,17 +403,6 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
     try {
       if (entry.id?.isNotEmpty == true) {
         await RepliesSeenTracker.markReply(userId: userId, replyId: entry.id!);
-      }
-      if (entry.createdAt.millisecondsSinceEpoch > 0) {
-        final conversationId =
-            entry.honoo?.conversationId ??
-            entry.hinoo?.conversationId ??
-            widget.conversationId;
-        await RepliesSeenTracker.markAt(
-          entry.createdAt,
-          userId: userId,
-          conversationId: conversationId,
-        );
       }
     } catch (error) {
       debugPrint('Unable to persist displayed reply: $error');
@@ -420,7 +436,12 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
   }
 
   void _showLatestReceivedAndReveal({bool forceFocus = false}) {
-    if (!widget.isActive || _entries.isEmpty || !mounted) return;
+    if (!widget.isActive ||
+        _entries.isEmpty ||
+        !mounted ||
+        _missingNotificationTarget) {
+      return;
+    }
     final targetPage = _pageToShowFirst;
     final entry = _entries.reversed.elementAt(targetPage);
     final focusKey = '${widget.conversationId}:${entry.kind.name}:${entry.id}';
@@ -430,7 +451,12 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
     }
     _appliedFocusKey = focusKey;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !widget.isActive || _entries.isEmpty) return;
+      if (!mounted ||
+          !widget.isActive ||
+          _entries.isEmpty ||
+          _missingNotificationTarget) {
+        return;
+      }
       if (_pageController.hasClients) {
         _pageController.jumpToPage(targetPage);
         _currentPageIndex = targetPage;
@@ -583,7 +609,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
     if (_loading) {
       return const Center(child: LoadingSpinner(color: Colors.white));
     }
-    if (_entries.isEmpty) {
+    if (_entries.isEmpty || _missingNotificationTarget) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -591,7 +617,9 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                _loadError == null
+                _missingNotificationTarget
+                    ? 'La risposta notificata non è ancora disponibile.'
+                    : _loadError == null
                     ? 'Conversazione vuota'
                     : 'Non riesco a caricare la conversazione.',
                 textAlign: TextAlign.center,
@@ -600,7 +628,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
                   fontSize: 17,
                 ),
               ),
-              if (_loadError != null) ...[
+              if (_loadError != null || _missingNotificationTarget) ...[
                 const SizedBox(height: 8),
                 TextButton.icon(
                   onPressed: _load,
@@ -634,6 +662,9 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
           pageSnapping: true,
           physics: const PageScrollPhysics(parent: ClampingScrollPhysics()),
           onPageChanged: (index) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) widget.onReveal?.call(null);
+            });
             _currentPageIndex = index;
             _prefetchEntriesFrom(index);
             final reversed = _entries.reversed.toList(growable: false);

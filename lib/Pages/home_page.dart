@@ -106,6 +106,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         builder: (context, constraints) {
           final double maxWidth = constraints.maxWidth;
           final bool isPhone = maxWidth < 600;
+          final compact = constraints.maxHeight < 720;
           final double contentWidth = isPhone ? maxWidth : maxWidth * 0.5;
 
           return Stack(
@@ -132,9 +133,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     child: Center(
                       child: ConstrainedBox(
                         constraints: BoxConstraints(maxWidth: contentWidth),
-                        child: const Padding(
-                          padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
-                          child: _HomeIntro(),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: compact ? 4 : 16,
+                          ),
+                          child: _HomeIntro(compact: compact),
                         ),
                       ),
                     ),
@@ -156,7 +159,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 }
 
 class _HomeIntro extends StatelessWidget {
-  const _HomeIntro();
+  const _HomeIntro({required this.compact});
+
+  final bool compact;
 
   static const double _designWidth = 360;
   static const double _bottleIconSize = 42;
@@ -172,105 +177,101 @@ class _HomeIntro extends StatelessWidget {
     final regularStyle = GoogleFonts.arvo(
       color: HonooColor.onBackground,
       fontSize: 18,
-      height: 1.22,
+      height: compact ? 1.0 : 1.22,
       fontWeight: FontWeight.w400,
     );
 
-    return SingleChildScrollView(
-      key: const Key('home_intro_scroll'),
-      child: SizedBox(
-        width: _designWidth,
-        child: Text.rich(
-          TextSpan(
-            style: regularStyle,
-            children: [
-              TextSpan(
-                text: 'Ti regaliamo la Luna\nPer sempre\n\n',
-                style: regularStyle.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const TextSpan(
-                text:
-                    'Niente è per sempre\n'
-                    'E nessuno può regalarti la Luna\n\n'
-                    'È vero. Ma non per i poeti\n\n'
-                    'Vuoi essere un poeta di honoo?\n\n'
-                    'Scegli',
-              ),
-              const WidgetSpan(
-                child: SizedBox(key: Key('home_bottle_leading_gap'), width: 8),
-              ),
-              _inlineAction(
-                key: const Key('home_inline_bottle'),
-                asset: 'assets/icons/bottle.svg',
-                size: _bottleIconSize,
-                verticalOffset: _bottleIconVerticalOffset,
-                tooltip: 'Scrivi',
-                onPressed: () => SeaFooterBar.openComposer(context),
-              ),
-              const TextSpan(text: '\n\nOppure'),
-              const WidgetSpan(
-                child: SizedBox(key: Key('home_moon_leading_gap'), width: 8),
-              ),
-              _inlineAction(
-                key: const Key('home_inline_moon'),
-                asset: 'assets/icons/moon.svg',
-                size: _moonIconSize,
-                verticalOffset: _moonIconVerticalOffset,
-                tooltip: 'Vai sulla Luna',
-                onPressed: () => LunaFissa.openMoon(context),
-              ),
-              const TextSpan(text: '\ne guarda le vite degli altri\n\nO'),
-              const WidgetSpan(
-                child: SizedBox(key: Key('home_island_leading_gap'), width: 8),
-              ),
-              _inlineAction(
-                key: const Key('home_inline_island'),
-                asset: 'assets/icons/isoladellestorie/island.svg',
-                size: _islandIconSize,
-                verticalOffset: _islandIconVerticalOffset,
-                tooltip: "Vai all'Isola delle Storie",
-                onPressed: () => SeaFooterBar.openIsland(context),
-                tint: HonooColor.onBackground,
-              ),
-              const TextSpan(text: '\n'),
-              WidgetSpan(
-                alignment: PlaceholderAlignment.baseline,
-                baseline: TextBaseline.alphabetic,
-                child: Transform.translate(
-                  key: const Key('home_island_followup_text_offset'),
-                  offset: const Offset(0, _islandFollowupTextVerticalOffset),
-                  child: Text(
-                    'e viaggia nelle tue storie',
-                    key: const Key('home_island_followup_text'),
-                    style: regularStyle,
-                  ),
+    final gap = compact ? '\n' : '\n\n';
+    return SizedBox(
+      width: _designWidth,
+      child: Text.rich(
+        TextSpan(
+          style: regularStyle,
+          children: [
+            TextSpan(
+              text: 'Ti regaliamo la Luna\nPer sempre$gap',
+              style: regularStyle.copyWith(fontWeight: FontWeight.w700),
+            ),
+            TextSpan(
+              text:
+                  'Niente è per sempre\n'
+                  'E nessuno può regalarti la Luna$gap'
+                  'È vero. Ma non per i poeti$gap'
+                  'Vuoi essere un poeta di honoo?$gap'
+                  'Scegli',
+            ),
+            const WidgetSpan(
+              child: SizedBox(key: Key('home_bottle_leading_gap'), width: 8),
+            ),
+            _inlineAction(
+              key: const Key('home_inline_bottle'),
+              asset: 'assets/icons/bottle.svg',
+              size: _bottleIconSize,
+              verticalOffset: _bottleIconVerticalOffset,
+              tooltip: 'Scrivi',
+              onPressed: () => SeaFooterBar.openComposer(context),
+            ),
+            TextSpan(text: '${gap}Oppure'),
+            const WidgetSpan(
+              child: SizedBox(key: Key('home_moon_leading_gap'), width: 8),
+            ),
+            _inlineAction(
+              key: const Key('home_inline_moon'),
+              asset: 'assets/icons/moon.svg',
+              size: _moonIconSize,
+              verticalOffset: _moonIconVerticalOffset,
+              tooltip: 'Vai sulla Luna',
+              onPressed: () => LunaFissa.openMoon(context),
+            ),
+            TextSpan(text: '\ne guarda le vite degli altri${gap}O'),
+            const WidgetSpan(
+              child: SizedBox(key: Key('home_island_leading_gap'), width: 8),
+            ),
+            _inlineAction(
+              key: const Key('home_inline_island'),
+              asset: 'assets/icons/isoladellestorie/island.svg',
+              size: _islandIconSize,
+              verticalOffset: _islandIconVerticalOffset,
+              tooltip: "Vai all'Isola delle Storie",
+              onPressed: () => SeaFooterBar.openIsland(context),
+              tint: HonooColor.onBackground,
+            ),
+            const TextSpan(text: '\n'),
+            WidgetSpan(
+              alignment: PlaceholderAlignment.baseline,
+              baseline: TextBaseline.alphabetic,
+              child: Transform.translate(
+                key: const Key('home_island_followup_text_offset'),
+                offset: const Offset(0, _islandFollowupTextVerticalOffset),
+                child: Text(
+                  'e viaggia nelle tue storie',
+                  key: const Key('home_island_followup_text'),
+                  style: regularStyle,
                 ),
               ),
-              const TextSpan(text: '\n\nO'),
-              const WidgetSpan(
-                child: SizedBox(key: Key('home_honoo_leading_gap'), width: 8),
+            ),
+            TextSpan(text: '${gap}O'),
+            const WidgetSpan(
+              child: SizedBox(key: Key('home_honoo_leading_gap'), width: 8),
+            ),
+            WidgetSpan(
+              alignment: PlaceholderAlignment.baseline,
+              baseline: TextBaseline.alphabetic,
+              child: HonooAppTitle(
+                key: const Key('home_inline_honoo'),
+                fontSize: 23,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const PlaceholderPage()),
+                  );
+                },
               ),
-              WidgetSpan(
-                alignment: PlaceholderAlignment.baseline,
-                baseline: TextBaseline.alphabetic,
-                child: HonooAppTitle(
-                  key: const Key('home_inline_honoo'),
-                  fontSize: 23,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const PlaceholderPage(),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const TextSpan(text: '\ne vedi tutto'),
-            ],
-          ),
-          key: const Key('home_intro_text'),
-          textAlign: TextAlign.center,
+            ),
+            const TextSpan(text: '\ne vedi tutto'),
+          ],
         ),
+        key: const Key('home_intro_text'),
+        textAlign: TextAlign.center,
       ),
     );
   }
@@ -294,6 +295,9 @@ class _HomeIntro extends StatelessWidget {
           constraints: BoxConstraints.tightFor(width: size, height: size),
           padding: EdgeInsets.zero,
           visualDensity: VisualDensity.compact,
+          style: IconButton.styleFrom(
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
           tooltip: tooltip,
           onPressed: onPressed,
           icon: SvgPicture.asset(

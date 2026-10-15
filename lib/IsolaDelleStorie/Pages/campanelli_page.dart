@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import '../../Utility/knocks_seen_tracker.dart';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1041,17 +1043,41 @@ class _CampanelliPageState extends State<CampanelliPage>
   }
 
   Future<void> _showKnockRequestOnce(PendingKnock knock) async {
-    if (!mounted ||
-        _isShowingKnockRequest ||
-        !_shownKnockRequestIds.add(knock.id)) {
-      return;
-    }
+    if (!mounted || _isShowingKnockRequest) return;
+    final userId = SupabaseProvider.client.auth.currentUser?.id;
+    if (userId == null) return;
     _isShowingKnockRequest = true;
     try {
-      await _openPendingKnock(knock);
+      final seen = await KnocksSeenTracker.load(userId);
+      if (!mounted) return;
+      setState(() => _shownKnockRequestIds.addAll(seen));
+      final queued = {
+        for (final item in _pendingKnocks) item.id: item,
+        knock.id: knock,
+      }.values.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      for (final item in queued) {
+        if (!mounted ||
+            SupabaseProvider.client.auth.currentUser?.id != userId) {
+          return;
+        }
+        if (_shownKnockRequestIds.contains(item.id)) {
+          continue;
+        }
+        await _openPendingKnock(item);
+      }
     } finally {
       _isShowingKnockRequest = false;
     }
+  }
+
+  Future<T?> _trackKnockView<T>(PendingKnock knock, Future<T?> opened) async {
+    final userId = SupabaseProvider.client.auth.currentUser?.id;
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted && userId != null) {
+      setState(() => _shownKnockRequestIds.add(knock.id));
+      await KnocksSeenTracker.mark(userId, knock.id);
+    }
+    return opened;
   }
 
   _CampanelloEntry? _entryForTag(String? tag) {
@@ -1151,13 +1177,16 @@ class _CampanelliPageState extends State<CampanelliPage>
     final entry = _entryForTag(knock.targetTag);
     if (entry == null) return;
     if (knock.hinooId == null && knock.honooId == null) {
-      final bool? openHouse = await showDialog<bool>(
-        context: context,
-        barrierDismissible: true,
-        builder: (_) => const HonooConfirmDialog(
-          title: 'Qualcuno sta bussando alla tua casa, vuoi farlo entrare?',
-          confirmLabel: 'Sì',
-          cancelLabel: 'No',
+      final bool? openHouse = await _trackKnockView(
+        knock,
+        showDialog<bool>(
+          context: context,
+          barrierDismissible: true,
+          builder: (_) => const HonooConfirmDialog(
+            title: 'Qualcuno sta bussando alla tua casa, vuoi farlo entrare?',
+            confirmLabel: 'Sì',
+            cancelLabel: 'No',
+          ),
         ),
       );
 
@@ -1172,8 +1201,11 @@ class _CampanelliPageState extends State<CampanelliPage>
         knock.hinooId!,
       );
       if (draft == null || !mounted) return;
-      final bool? approved = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(builder: (_) => PendingHinooPage(draft: draft)),
+      final bool? approved = await _trackKnockView(
+        knock,
+        Navigator.of(context).push<bool>(
+          MaterialPageRoute(builder: (_) => PendingHinooPage(draft: draft)),
+        ),
       );
 
       if (approved == true && mounted) {
@@ -1187,8 +1219,11 @@ class _CampanelliPageState extends State<CampanelliPage>
         knock.honooId!,
       );
       if (honoo == null || !mounted) return;
-      final bool? approved = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(builder: (_) => PendingHonooPage(honoo: honoo)),
+      final bool? approved = await _trackKnockView(
+        knock,
+        Navigator.of(context).push<bool>(
+          MaterialPageRoute(builder: (_) => PendingHonooPage(honoo: honoo)),
+        ),
       );
 
       if (approved == true && mounted) {
@@ -1300,7 +1335,9 @@ class _CampanelliPageState extends State<CampanelliPage>
               activeCampanelloId != null &&
               _pendingKnockTags.contains(activeCampanelloId);
           final bool hasAnyPendingKnock = _pendingKnockTags.isNotEmpty;
-          final int pendingKnockCount = _pendingKnocks.length;
+          final int pendingKnockCount = _pendingKnocks
+              .where((knock) => !_shownKnockRequestIds.contains(knock.id))
+              .length;
           final bool casaUnlocked = activeCampanello == null
               ? false
               : _isCampanelloUnlocked(activeCampanello.id);

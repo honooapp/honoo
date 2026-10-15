@@ -59,11 +59,13 @@ class _GlobalReplyNotificationListenerState
   final Set<String> _deliveredEventKeys = <String>{};
   final Map<String, ReplyNotificationEvent> _pendingEvents =
       <String, ReplyNotificationEvent>{};
-  final Map<String, ReplyNotificationEvent> _shownEventsByConversation =
+  final Map<String, ReplyNotificationEvent> _shownEvents =
       <String, ReplyNotificationEvent>{};
   bool _multipleNotificationShown = false;
   int _notificationGeneration = 0;
   final Set<DialogRoute<bool>> _notificationDialogs = {};
+  final Map<DialogRoute<bool>, List<ReplyNotificationEvent>> _dialogEvents = {};
+  bool _openingReplies = false;
 
   @override
   void initState() {
@@ -255,7 +257,12 @@ class _GlobalReplyNotificationListenerState
     if (!mounted || generation != _notificationGeneration || events.isEmpty) {
       return;
     }
-    final event = events.last;
+    events.sort(
+      (a, b) => (b.createdAt ?? DateTime(1970)).compareTo(
+        a.createdAt ?? DateTime(1970),
+      ),
+    );
+    final event = events.first;
     final replyCount = events.length;
     final conversationIds = events.map((item) => item.conversationId).toSet();
     final hasMultipleConversations = conversationIds.length > 1;
@@ -263,11 +270,7 @@ class _GlobalReplyNotificationListenerState
 
     void open() {
       if (!mounted || generation != _notificationGeneration) return;
-      if (hasMultipleConversations) {
-        _openRepliesInbox();
-      } else {
-        _openConversation(event);
-      }
+      unawaited(_openUnseenReplies(events));
     }
 
     _systemNotification.show(
@@ -281,13 +284,19 @@ class _GlobalReplyNotificationListenerState
     _multipleNotificationShown =
         _multipleNotificationShown || hasMultipleConversations;
     for (final item in events) {
-      _shownEventsByConversation[item.conversationId] = item;
+      _shownEvents['${item.kind.name}:${item.replyId ?? item.conversationId}'] =
+          item;
     }
 
     final context = widget.navigatorKey.currentContext;
     if (context != null && context.mounted) {
       unawaited(
-        _showReplyDialog(context, replyCount: replyCount, onOpen: open),
+        _showReplyDialog(
+          context,
+          events: events,
+          replyCount: replyCount,
+          onOpen: open,
+        ),
       );
     }
   }
@@ -319,33 +328,49 @@ class _GlobalReplyNotificationListenerState
   }
 
   Future<void> _closeNotificationsAlreadySeen() async {
-    if (_shownEventsByConversation.isEmpty && _pendingEvents.isEmpty) return;
+    if (_shownEvents.isEmpty &&
+        _pendingEvents.isEmpty &&
+        _notificationDialogs.isEmpty) {
+      return;
+    }
     final generation = _notificationGeneration;
     final events = <ReplyNotificationEvent>{
-      ..._shownEventsByConversation.values,
+      ..._shownEvents.values,
       ..._pendingEvents.values,
     }.toList(growable: false);
     final unseen = await _onlyUnseenEvents(events);
     if (!mounted || generation != _notificationGeneration) return;
+    for (final route in _notificationDialogs.toList()) {
+      final remaining = await _onlyUnseenEvents(_dialogEvents[route] ?? []);
+      if (!mounted || generation != _notificationGeneration) return;
+      if (remaining.isEmpty && route.isActive) {
+        route.navigator?.removeRoute(route);
+      }
+    }
     final unseenConversations = unseen.map((e) => e.conversationId).toSet();
-    final shownConversations = _shownEventsByConversation.keys.toList();
+    final shownConversations = _shownEvents.values
+        .map((e) => e.conversationId)
+        .toSet();
     for (final conversationId in shownConversations) {
       if (unseenConversations.contains(conversationId)) continue;
       _systemNotification.closeConversation(conversationId);
-      _shownEventsByConversation.remove(conversationId);
     }
-    if (_multipleNotificationShown && _shownEventsByConversation.isEmpty) {
+    _shownEvents.removeWhere(
+      (_, event) => events.contains(event) && !unseen.contains(event),
+    );
+    if (_multipleNotificationShown && _shownEvents.isEmpty) {
       _systemNotification.closeConversation('multiple-conversations');
       _multipleNotificationShown = false;
     }
     _pendingEvents.removeWhere(
-      (_, event) => !unseenConversations.contains(event.conversationId),
+      (_, event) => events.contains(event) && !unseen.contains(event),
     );
   }
 
   Future<void> _showReplyDialog(
     BuildContext context, {
     required int replyCount,
+    required List<ReplyNotificationEvent> events,
     required VoidCallback onOpen,
   }) async {
     final route = DialogRoute<bool>(
@@ -360,11 +385,13 @@ class _GlobalReplyNotificationListenerState
       ),
     );
     _notificationDialogs.add(route);
+    _dialogEvents[route] = events;
     final bool? shouldOpen;
     try {
       shouldOpen = await Navigator.of(context, rootNavigator: true).push(route);
     } finally {
       _notificationDialogs.remove(route);
+      _dialogEvents.remove(route);
     }
     if (!mounted || shouldOpen != true) return;
     onOpen();
@@ -440,28 +467,42 @@ class _GlobalReplyNotificationListenerState
     }
   }
 
-  void _openConversation(ReplyNotificationEvent event) {
-    _systemNotification.closeConversation(event.conversationId);
-    widget.navigatorKey.currentState?.push(
-      MaterialPageRoute(
-        builder: (_) => ChestPage(
-          focusReplies: true,
-          focusConversationId: event.conversationId,
-          focusReplyId: event.replyId,
-          highlightLatest: true,
-        ),
-      ),
-    );
-  }
-
-  void _openRepliesInbox() {
-    _systemNotification.closeConversation('multiple-conversations');
-    widget.navigatorKey.currentState?.push(
-      MaterialPageRoute(
-        builder: (_) =>
-            const ChestPage(focusReplies: true, highlightLatest: true),
-      ),
-    );
+  Future<void> _openUnseenReplies(List<ReplyNotificationEvent> events) async {
+    if (_openingReplies) return;
+    _openingReplies = true;
+    for (final route in _notificationDialogs.toList()) {
+      if (route.isActive) route.navigator?.removeRoute(route);
+    }
+    final generation = _notificationGeneration;
+    try {
+      final ordered = List<ReplyNotificationEvent>.of(events)
+        ..sort(
+          (a, b) => (b.createdAt ?? DateTime(1970)).compareTo(
+            a.createdAt ?? DateTime(1970),
+          ),
+        );
+      for (final event in ordered) {
+        final unseen = await _onlyUnseenEvents([event]);
+        if (!mounted || generation != _notificationGeneration) return;
+        if (unseen.isEmpty) continue;
+        final navigator = widget.navigatorKey.currentState;
+        if (navigator == null) return;
+        _systemNotification.closeConversation('multiple-conversations');
+        _systemNotification.closeConversation(event.conversationId);
+        await navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => ChestPage(
+              focusReplies: true,
+              focusConversationId: event.conversationId,
+              focusReplyId: event.replyId,
+              highlightLatest: true,
+            ),
+          ),
+        );
+      }
+    } finally {
+      _openingReplies = false;
+    }
   }
 
   void _closeRealtime({bool clearUser = true}) {
@@ -492,7 +533,8 @@ class _GlobalReplyNotificationListenerState
   void _resetNotifications() {
     _notificationGeneration++;
     _deliveredEventKeys.clear();
-    for (final conversationId in _shownEventsByConversation.keys) {
+    for (final conversationId
+        in _shownEvents.values.map((e) => e.conversationId).toSet()) {
       _systemNotification.closeConversation(conversationId);
     }
     if (_multipleNotificationShown) {
@@ -502,10 +544,11 @@ class _GlobalReplyNotificationListenerState
       if (route.isActive) route.navigator?.removeRoute(route);
     }
     _notificationDialogs.clear();
+    _dialogEvents.clear();
     _notificationTimer?.cancel();
     _notificationTimer = null;
     _pendingEvents.clear();
-    _shownEventsByConversation.clear();
+    _shownEvents.clear();
     _multipleNotificationShown = false;
   }
 

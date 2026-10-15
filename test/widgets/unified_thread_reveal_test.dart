@@ -104,10 +104,12 @@ void main() {
       ),
     );
 
+    final revealed = <ConversationEntry?>[];
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: UnifiedThreadView(
+            onReveal: revealed.add,
             conversationId: 'conversation-1',
             maxWidth: 600,
             maxHeight: 700,
@@ -130,6 +132,9 @@ void main() {
     );
     expect(foreground.transform.getTranslation().y, lessThan(0));
     expect(foreground.transform.getTranslation().y, greaterThanOrEqualTo(-336));
+    expect(revealed.last?.id, root.id);
+    await tester.pumpAndSettle();
+    expect(revealed.last, isNull);
   });
 
   testWidgets('il bounce mostra il segnaposto del contenuto eliminato', (

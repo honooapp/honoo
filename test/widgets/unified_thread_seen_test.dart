@@ -56,6 +56,7 @@ void main() {
       '$kind: lettura persistente solo dopo attivazione, anche senza onSelect',
       (tester) async {
         final received = entry('received', 'other', 11);
+        final older = entry('older', 'other', 10);
         Widget view(bool active) => MaterialApp(
           home: Scaffold(
             body: UnifiedThreadView(
@@ -63,7 +64,7 @@ void main() {
               maxWidth: 800,
               maxHeight: 600,
               isActive: active,
-              conversationLoader: (_) async => [received],
+              conversationLoader: (_) async => [older, received],
             ),
           ),
         );
@@ -78,6 +79,14 @@ void main() {
         await tester.pump();
         final reloaded = await RepliesSeenTracker.load(userId: 'test_user');
         expect(reloaded.replyIds, contains('received'));
+        expect(
+          reloaded.isSeen(
+            conversationId: 'conversation',
+            createdAt: older.createdAt,
+            replyId: 'older',
+          ),
+          isFalse,
+        );
         expect(
           reloaded.isSeen(
             conversationId: 'conversation',

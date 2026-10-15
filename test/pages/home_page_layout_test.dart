@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:honoo/Pages/home_page.dart';
 import 'package:honoo/IsolaDelleStorie/Pages/campanelli_page.dart';
@@ -31,7 +34,19 @@ void main() {
 
   late SupabaseTestHarness harness;
 
-  setUpAll(registerSupabaseFallbacks);
+  setUpAll(() async {
+    registerSupabaseFallbacks();
+    for (final entry in [
+      (FontWeight.w400, 'Regular'),
+      (FontWeight.w700, 'Bold'),
+    ]) {
+      final family = GoogleFonts.arvo(fontWeight: entry.$1).fontFamily!;
+      await (FontLoader(family)..addFont(
+            rootBundle.load('assets/google_fonts/Arvo-${entry.$2}.ttf'),
+          ))
+          .load();
+    }
+  });
 
   setUp(() {
     harness = SupabaseTestHarness();
@@ -64,7 +79,7 @@ void main() {
     expect(intro, findsOneWidget);
     expect(find.textContaining('Ti regaliamo la Luna'), findsOneWidget);
     expect(
-      find.textContaining('È vero. Ma non per i poeti\n\nVuoi essere'),
+      find.textContaining('È vero. Ma non per i poeti\nVuoi essere'),
       findsOneWidget,
     );
     expect(find.byKey(const Key('home_island_followup_text')), findsOneWidget);
@@ -73,8 +88,26 @@ void main() {
     );
     expect(islandFollowupTransform.transform.getTranslation().y, -2);
     expect(find.textContaining('e vedi tutto'), findsOneWidget);
-    expect(find.byKey(const Key('home_intro_scroll')), findsOneWidget);
+    expect(find.byType(SingleChildScrollView), findsNothing);
+    final introRect = tester.getRect(intro);
+    expect(introRect.top, greaterThanOrEqualTo(52));
+    expect(
+      introRect.bottom,
+      lessThanOrEqualTo(tester.view.physicalSize.height - 100),
+    );
     expect(tester.widget<Text>(intro).textSpan!.style!.fontSize, 18);
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.descendant(of: intro, matching: find.byType(RichText)).first,
+    );
+    final length = paragraph.text.toPlainText().length;
+    final boxes = paragraph.getBoxesForSelection(
+      TextSelection(baseOffset: length - 11, extentOffset: length),
+    );
+    expect(boxes, isNotEmpty);
+    expect(
+      paragraph.localToGlobal(Offset(0, boxes.last.bottom)).dy,
+      lessThanOrEqualTo(tester.getRect(find.byType(SeaFooterBar)).top),
+    );
     expect(
       find.ancestor(of: intro, matching: find.byType(FittedBox)),
       findsNothing,
@@ -121,7 +154,13 @@ void main() {
     await pumpHomeAtSize(tester, const Size(1440, 1000));
 
     expect(find.byKey(const Key('home_intro_text')), findsOneWidget);
-    expect(find.byKey(const Key('home_intro_scroll')), findsOneWidget);
+    expect(find.byType(SingleChildScrollView), findsNothing);
+    final desktopIntroRect = tester.getRect(intro);
+    expect(desktopIntroRect.top, greaterThanOrEqualTo(52));
+    expect(
+      desktopIntroRect.bottom,
+      lessThanOrEqualTo(tester.view.physicalSize.height - 100),
+    );
     expect(tester.widget<Text>(intro).textSpan!.style!.fontSize, 18);
     expect(
       find.ancestor(of: intro, matching: find.byType(FittedBox)),
@@ -133,7 +172,7 @@ void main() {
   });
 
   for (final size in const [Size(320, 500), Size(1440, 1000)]) {
-    testWidgets('casa sopra l isola e accessi distinti a $size', (
+    testWidgets('casa sotto la Luna sopra le onde e accessi distinti a $size', (
       tester,
     ) async {
       await pumpHomeAtSize(tester, size);
@@ -143,10 +182,12 @@ void main() {
       expect(island.hitTestable(), findsOneWidget);
       final houseRect = tester.getRect(house);
       final islandRect = tester.getRect(island);
-      expect(houseRect.center.dx, islandRect.center.dx);
-      // The wide island SVG is centered inside its historical square button.
-      final islandImageTop = islandRect.center.dy - (180 * 15 / 62) / 2;
-      expect(houseRect.bottom, lessThan(islandImageTop));
+      expect(houseRect.center.dx, lessThan(islandRect.center.dx));
+      expect(
+        houseRect.bottom,
+        closeTo(size.height - SeaFooterBar.height * 0.64, 0.01),
+      );
+      expect(houseRect.center.dx, closeTo(size.width >= 1200 ? 52 : 32, 0.01));
       expect(houseRect.left, greaterThanOrEqualTo(0));
       expect(houseRect.right, lessThanOrEqualTo(size.width));
       expect(tester.takeException(), isNull);

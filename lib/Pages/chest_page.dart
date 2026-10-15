@@ -116,6 +116,12 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
   Map<String, List<HinooThreadEntry>> get _hinooRepliesByRoot =>
       _chestController.value.hinooRepliesByRoot;
   ConversationEntry? _selectedConvEntry;
+  ConversationEntry? _revealedConvEntry;
+
+  void _setRevealedEntry(ConversationEntry? entry) {
+    if (mounted) setState(() => _revealedConvEntry = entry);
+  }
+
   final Map<String, ConversationEntry> _selectedEntriesByConversation = {};
   bool get _isHinooLoading => _chestController.value.isHinooLoading;
   final cs.CarouselSliderController _carouselController =
@@ -568,6 +574,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
       setState(() {
         _activeConversationId = null;
         _selectedConvEntry = null;
+        _revealedConvEntry = null;
         _detachedConversationVisible = false;
         _lastRebuildSignature = null;
       });
@@ -1130,6 +1137,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     return ChestItemView(
       key: ValueKey(_slideIdentity(item)),
       onSaved: _loadAll,
+      onReveal: _setRevealedEntry,
       item: item,
       availableHeight: availableCenterH,
       maxWidth: targetMaxW,
@@ -1213,9 +1221,10 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
             ? null
             : items[_currentIndex.clamp(0, items.length - 1)];
         final currentUserId = SupabaseProvider.client.auth.currentUser?.id;
-        final pageStyle = _selectedConvEntry != null
+        final styledEntry = _revealedConvEntry ?? _selectedConvEntry;
+        final pageStyle = styledEntry != null
             ? ChestContentStyle.forConversationEntry(
-                _selectedConvEntry!,
+                styledEntry,
                 viewerUserId: currentUserId,
               )
             : currentItem == null
@@ -1311,6 +1320,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
                     final conversationId = isDetachedPage
                         ? focusedConversationId
                         : _convIdOfItem(items[_currentIndex]);
+                    _revealedConvEntry = null;
                     _selectedConvEntry =
                         _selectedEntriesByConversation[conversationId];
                   });
@@ -1323,6 +1333,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
                 if (showDetachedFocusedConversation && index == 0) {
                   return UnifiedThreadView(
                     key: ValueKey('detached:$focusedConversationId'),
+                    onReveal: _setRevealedEntry,
                     conversationId: focusedConversationId,
                     maxWidth: viewW,
                     maxHeight: availableH,

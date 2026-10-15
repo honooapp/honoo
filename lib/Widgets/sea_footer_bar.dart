@@ -1,3 +1,4 @@
+import 'luna_fissa.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -40,7 +41,7 @@ class SeaFooterBar extends StatelessWidget {
     return SizedBox(
       // Include the house button in the hit-test area above the existing sea.
       height: showHouseEntry
-          ? height + 65 + MediaQuery.of(context).viewPadding.bottom
+          ? height * 0.64 + 44 + MediaQuery.of(context).viewPadding.bottom
           : height,
       width: double.infinity,
       child: LayoutBuilder(
@@ -171,14 +172,16 @@ class SeaFooterBar extends StatelessWidget {
 
               if (showHouseEntry)
                 Positioned(
-                  bottom: safeBottom + height,
-                  left: islandX + (islandSize - 55) / 2,
+                  bottom: safeBottom + height * 0.64,
+                  left:
+                      (w >= 1200 ? 16 : 8) +
+                      (LunaFissa.iconSizeForWidth(w) - 44) / 2,
                   child: IconButton(
                     key: const Key('home_house_entry'),
                     tooltip: 'La tua casa',
                     constraints: const BoxConstraints.tightFor(
-                      width: 55,
-                      height: 55,
+                      width: 44,
+                      height: 44,
                     ),
                     padding: EdgeInsets.zero,
                     iconSize: 27.5,

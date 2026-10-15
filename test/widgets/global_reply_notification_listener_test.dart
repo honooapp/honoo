@@ -350,6 +350,8 @@ void main() {
     await tester.pump();
 
     expect(notification.closedConversations, contains('conversation-now-seen'));
+    await tester.pumpAndSettle();
+    expect(find.text('Hai ricevuto una nuova risposta'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -404,8 +406,18 @@ void main() {
       notification.onTap!();
       await tester.pumpAndSettle();
       final chestPage = tester.widget<ChestPage>(find.byType(ChestPage));
-      expect(chestPage.focusConversationId, isNull);
-      expect(chestPage.focusReplyId, isNull);
+      expect(chestPage.focusConversationId, 'conversation-999');
+      expect(chestPage.focusReplyId, 'reply-999');
+      await RepliesSeenTracker.markReply(
+        userId: 'test_user',
+        replyId: 'reply-998',
+      );
+      navigatorKey.currentState!.pop();
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<ChestPage>(find.byType(ChestPage)).focusReplyId,
+        'reply-997',
+      );
       expect(
         notification.closedConversations,
         contains('multiple-conversations'),

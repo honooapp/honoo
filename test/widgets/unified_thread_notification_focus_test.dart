@@ -116,8 +116,12 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(selected?.id, 'latest-received');
-      expect(selected?.isFromMoonSaved, isFalse);
+      expect(selected, isNull);
+      expect(
+        find.text('La risposta notificata non è ancora disponibile.'),
+        findsOneWidget,
+      );
+      expect(find.text('Riprova'), findsOneWidget);
     },
   );
 }
