@@ -81,11 +81,7 @@ void main() {
       find.textContaining('È vero. Ma non per i poeti\n\nVuoi essere'),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('home_island_followup_text')), findsOneWidget);
-    final islandFollowupTransform = tester.widget<Transform>(
-      find.byKey(const Key('home_island_followup_text_offset')),
-    );
-    expect(islandFollowupTransform.transform.getTranslation().y, -2);
+    expect(find.textContaining('e viaggia nelle tue storie'), findsOneWidget);
     expect(find.textContaining('e vedi tutto'), findsOneWidget);
     expect(find.byType(SingleChildScrollView), findsOneWidget);
     expect(tester.widget<Text>(intro).textSpan!.style!.fontSize, 18);

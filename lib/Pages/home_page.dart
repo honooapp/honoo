@@ -170,7 +170,6 @@ class _HomeIntro extends StatelessWidget {
   static const double _bottleIconVerticalOffset = 9;
   static const double _moonIconVerticalOffset = 1;
   static const double _islandIconVerticalOffset = 17;
-  static const double _islandFollowupTextVerticalOffset = -2;
 
   @override
   Widget build(BuildContext context) {
@@ -223,7 +222,7 @@ class _HomeIntro extends StatelessWidget {
               tooltip: 'Vai sulla Luna',
               onPressed: () => LunaFissa.openMoon(context),
             ),
-            const TextSpan(text: '\ne guarda le vite degli altri${gap}O'),
+            const TextSpan(text: '\ne guarda le vite degli altri\nO'),
             const WidgetSpan(
               child: SizedBox(key: Key('home_island_leading_gap'), width: 8),
             ),
@@ -236,20 +235,7 @@ class _HomeIntro extends StatelessWidget {
               onPressed: () => SeaFooterBar.openIsland(context),
               tint: HonooColor.onBackground,
             ),
-            const TextSpan(text: '\n'),
-            WidgetSpan(
-              alignment: PlaceholderAlignment.baseline,
-              baseline: TextBaseline.alphabetic,
-              child: Transform.translate(
-                key: const Key('home_island_followup_text_offset'),
-                offset: const Offset(0, _islandFollowupTextVerticalOffset),
-                child: Text(
-                  'e viaggia nelle tue storie',
-                  key: const Key('home_island_followup_text'),
-                  style: regularStyle,
-                ),
-              ),
-            ),
+            const TextSpan(text: '\ne viaggia nelle tue storie'),
             const TextSpan(text: '${gap}O'),
             const WidgetSpan(
               child: SizedBox(key: Key('home_honoo_leading_gap'), width: 8),
@@ -271,6 +257,10 @@ class _HomeIntro extends StatelessWidget {
           ],
         ),
         key: const Key('home_intro_text'),
+        strutStyle: StrutStyle.fromTextStyle(
+          regularStyle,
+          forceStrutHeight: true,
+        ),
         textAlign: TextAlign.center,
       ),
     );
