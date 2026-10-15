@@ -97,7 +97,7 @@ class _ActionAnimationHostState extends State<ActionAnimationHost> {
     } catch (_) {
       // Keep the successful operation and its navigation intact.
     } finally {
-      watchdog?.cancel();
+      watchdog.cancel();
       controller.removeListener(listen);
       if (mounted) {
         setState(() {
