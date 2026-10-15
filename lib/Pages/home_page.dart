@@ -222,7 +222,7 @@ class _HomeIntro extends StatelessWidget {
               tooltip: 'Vai sulla Luna',
               onPressed: () => LunaFissa.openMoon(context),
             ),
-            const TextSpan(text: '\ne guarda le vite degli altri\nO'),
+            const TextSpan(text: '\ne guarda le vite degli altri\n\nO'),
             const WidgetSpan(
               child: SizedBox(key: Key('home_island_leading_gap'), width: 8),
             ),
