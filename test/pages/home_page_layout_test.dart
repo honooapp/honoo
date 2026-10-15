@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:honoo/Pages/home_page.dart';
+import 'package:honoo/Pages/email_login_page.dart';
 import 'package:honoo/IsolaDelleStorie/Pages/campanelli_page.dart';
 import 'package:honoo/Pages/placeholder_page.dart';
 import 'package:honoo/Services/home_service.dart';
@@ -181,13 +182,18 @@ void main() {
     });
   }
 
-  testWidgets('l icona casa apre l invito per chi non ha casa', (tester) async {
-    final rpc = MockQueryChain()..queueResponse(const []);
-    when(
-      () => harness.client.rpc('get_public_admin_campanelli'),
-    ).thenAnswer((_) => rpc);
+  testWidgets('l icona casa richiede login e poi apre l invito senza casa', (
+    tester,
+  ) async {
+    harness.stubTable('case');
     await pumpHomeAtSize(tester, const Size(320, 600));
     await tester.tap(find.byKey(const Key('home_house_entry')));
+    await tester.pumpAndSettle();
+    expect(find.byType(EmailLoginPage), findsOneWidget);
+    expect(find.byType(CampanelliPage), findsNothing);
+    when(() => harness.auth.currentUser).thenReturn(harness.user);
+    when(() => harness.auth.currentSession).thenReturn(harness.session);
+    Navigator.of(tester.element(find.byType(EmailLoginPage))).pop(true);
     await tester.pumpAndSettle();
     expect(
       tester.widget<CampanelliPage>(find.byType(CampanelliPage)).openOwnHouse,
@@ -198,6 +204,16 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Clicca qui'), findsOneWidget);
+  });
+
+  testWidgets('annullare il login casa lascia sulla home', (tester) async {
+    await pumpHomeAtSize(tester, const Size(320, 600));
+    await tester.tap(find.byKey(const Key('home_house_entry')));
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.byType(EmailLoginPage))).pop();
+    await tester.pumpAndSettle();
+    expect(find.byType(HomePage), findsOneWidget);
+    expect(find.byType(CampanelliPage), findsNothing);
   });
 
   testWidgets("la scritta honoo apre la placeholder page", (tester) async {

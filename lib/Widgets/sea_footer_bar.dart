@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:honoo/Utility/honoo_colors.dart';
 import 'package:honoo/Widgets/composer_onboarding.dart';
+import 'package:honoo/Services/auth_navigation_service.dart';
 
 // Pagine per la navigazione (come in HomePage)
 import 'package:honoo/IsolaDelleStorie/Pages/island_page.dart';
@@ -191,12 +192,17 @@ class SeaFooterBar extends StatelessWidget {
                       height: 27.5,
                       semanticsLabel: 'La tua casa',
                     ),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            const CampanelliPage(openOwnHouse: true),
-                      ),
-                    ),
+                    onPressed: () async {
+                      final loggedIn =
+                          await AuthNavigationService.ensureLoggedIn(context);
+                      if (!context.mounted || !loggedIn) return;
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const CampanelliPage(openOwnHouse: true),
+                        ),
+                      );
+                    },
                   ),
                 ),
 
