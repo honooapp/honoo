@@ -46,6 +46,10 @@ import 'new_hinoo_page.dart';
 import 'home_page.dart';
 import 'placeholder_page.dart';
 import 'package:honoo/Entities/conversation_entry.dart';
+import '../Services/house_guests_service.dart';
+import '../Services/campanelli_repository.dart';
+import '../Utility/reply_notification_signal.dart';
+import 'casa_share_selection_page.dart';
 import 'package:honoo/Entities/conversation_link.dart';
 
 class ChestPage extends StatefulWidget {
@@ -71,6 +75,46 @@ class ChestPage extends StatefulWidget {
 }
 
 class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
+  List<HouseGuest> _houseRequests = [];
+  bool _openingHouse = false;
+
+  Future<void> _loadHouseRequests() async {
+    try {
+      final requests = await HouseGuestsService().fetch();
+      if (mounted) setState(() => _houseRequests = requests);
+    } catch (error) {
+      debugPrint('Unable to load house request actions: $error');
+    }
+  }
+
+  Future<void> _openHouse(HouseGuest request) async {
+    if (_openingHouse) return;
+    final modes = await Navigator.of(context).push<Set<CasaShareMode>>(
+      MaterialPageRoute(builder: (_) => const CasaShareSelectionPage()),
+    );
+    if (!mounted || modes == null || modes.isEmpty) return;
+    setState(() => _openingHouse = true);
+    try {
+      if (request.pending) {
+        await CampanelliDataRepository().approveHouseKnock(
+          knockId: request.id,
+          shareModes: modes.map((m) => m.dbValue).toList(),
+        );
+      } else {
+        await HouseGuestsService().update(request.id, modes);
+      }
+      await _loadHouseRequests();
+      ReplyNotificationSignal.notifyChanged();
+      if (mounted) showHonooToast(context, message: 'Casa aperta.');
+    } catch (_) {
+      if (mounted) {
+        showHonooToast(context, message: 'Casa non aperta. Ritenta.');
+      }
+    } finally {
+      if (mounted) setState(() => _openingHouse = false);
+    }
+  }
+
   // Conversational mode support
   // Structural only: no layout/axis/animation changes.
   // Two modes: normal chest vs conversation view fed into the same builder.
@@ -274,6 +318,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
   }
 
   Future<void> _reconcileAll() async {
+    unawaited(_loadHouseRequests());
     if (_isReconciling) {
       _reconcilePending = true;
       return;
@@ -604,12 +649,28 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     required double bottomPadding,
     required Color foregroundColor,
   }) {
+    final conversationId = _detachedConversationVisible
+        ? _detachedFocusedConversationId ??
+              widget.focusConversationId ??
+              (item == null ? null : _convIdOfItem(item))
+        : (item == null ? null : _convIdOfItem(item));
+    final request = _houseRequests
+        .where(
+          (r) => r.conversationId != null && r.conversationId == conversationId,
+        )
+        .firstOrNull;
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 160),
       opacity: _isMutating ? 0.55 : 1,
       child: IgnorePointer(
         ignoring: _isMutating,
         child: ChestFooter(
+          onOpenHouse:
+              request != null &&
+                  !_openingHouse &&
+                  (request.pending || request.modes.isEmpty)
+              ? () => _openHouse(request)
+              : null,
           item: item,
           isAdmin: _isAdmin,
           isConversation:

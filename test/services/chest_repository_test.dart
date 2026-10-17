@@ -15,6 +15,7 @@ void main() {
   setUp(() {
     harness = SupabaseTestHarness(withAuthenticatedUser: true);
     harness.stubTable('users');
+    harness.stubTable('case');
     hinoo = harness.stubTable('hinoo');
     hiddenConversations = harness.stubTable('chest_hidden_conversations');
     repository = ChestRepository(client: harness.client);

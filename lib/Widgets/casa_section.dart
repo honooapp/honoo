@@ -22,6 +22,7 @@ class CasaSection extends StatelessWidget {
     this.onEditTap,
     this.onEditTextTap,
     this.onGuestsTap,
+    this.pendingRequestCount = 0,
   });
 
   final CasaData casa;
@@ -36,6 +37,7 @@ class CasaSection extends StatelessWidget {
   final VoidCallback? onEditTap;
   final VoidCallback? onEditTextTap;
   final VoidCallback? onGuestsTap;
+  final int pendingRequestCount;
 
   @override
   Widget build(BuildContext context) {
@@ -152,11 +154,15 @@ class CasaSection extends StatelessWidget {
               Positioned(
                 top: 44,
                 left: 6,
-                child: TextBoxDownloadButton(
-                  key: const ValueKey('own-house-guests'),
-                  tooltip: 'ospiti',
-                  asset: 'assets/icons/ospiti.svg',
-                  onPressed: onGuestsTap!,
+                child: Badge(
+                  isLabelVisible: pendingRequestCount > 0,
+                  label: Text('$pendingRequestCount'),
+                  child: TextBoxDownloadButton(
+                    key: const ValueKey('own-house-guests'),
+                    tooltip: 'ospiti',
+                    asset: 'assets/icons/ospiti.svg',
+                    onPressed: onGuestsTap!,
+                  ),
                 ),
               ),
             Positioned(

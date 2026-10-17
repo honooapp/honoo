@@ -10,8 +10,16 @@ class HouseGuest {
     required this.modes,
     this.honoo,
     this.hinoo,
+    this.pending = false,
+    this.conversationId,
+    this.contentId,
+    this.houseTag,
   });
   final String id;
+  final bool pending;
+  final String? conversationId;
+  final String? contentId;
+  final String? houseTag;
   final Set<CasaShareMode> modes;
   final Honoo? honoo;
   final HinooDraft? hinoo;
@@ -21,6 +29,10 @@ class HouseGuest {
     modes: Set.unmodifiable(modes),
     honoo: honoo,
     hinoo: hinoo,
+    pending: pending,
+    conversationId: conversationId,
+    contentId: contentId,
+    houseTag: houseTag,
   );
 
   factory HouseGuest.fromJson(Map row) {
@@ -28,6 +40,12 @@ class HouseGuest {
     final pages = hinoo is Map ? hinoo['pages'] : null;
     return HouseGuest(
       id: row['id'].toString(),
+      pending: row.containsKey('granted_at') && row['granted_at'] == null,
+      houseTag: row['target_house_tag']?.toString(),
+      conversationId:
+          ((row['honoo'] ?? row['hinoo']) as Map?)?['conversation_id']
+              ?.toString(),
+      contentId: ((row['honoo'] ?? row['hinoo']) as Map?)?['id']?.toString(),
       modes: (row['share_modes'] as List? ?? [])
           .map((m) => CasaShareMode.fromDb(m.toString()))
           .whereType<CasaShareMode>()
@@ -53,9 +71,9 @@ class HouseGuestsService {
     : _client = client ?? SupabaseProvider.client;
   final SupabaseClient _client;
 
-  Future<List<HouseGuest>> fetch(String houseTag) async {
+  Future<List<HouseGuest>> fetch([String? houseTag]) async {
     final rows = await _client
-        .rpc('get_house_guests', params: {'p_house_tag': houseTag})
+        .rpc('get_house_inbox', params: {'p_house_tag': houseTag})
         .timeout(const Duration(seconds: 12));
     return (rows as List).whereType<Map>().map(HouseGuest.fromJson).toList();
   }

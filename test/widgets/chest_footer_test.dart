@@ -68,6 +68,7 @@ void main() {
     ValueChanged<ConversationEntry>? onSendConversationEntryToMoon,
     Color foregroundColor = HonooColor.onBackground,
     bool isAdmin = false,
+    VoidCallback? onOpenHouse,
     double width = 800,
     double iconSize = 40,
   }) async {
@@ -79,6 +80,7 @@ void main() {
               width: width,
               child: ChestFooter(
                 item: item,
+                onOpenHouse: onOpenHouse,
                 isAdmin: isAdmin,
                 selectedConversationEntry: selectedConversationEntry,
                 currentUserId: 'current-user',
@@ -105,6 +107,23 @@ void main() {
       ),
     );
   }
+
+  testWidgets('house access is a separate action from replying', (
+    tester,
+  ) async {
+    var opened = 0;
+    await pumpFooter(
+      tester,
+      item: honooItem(HonooType.answer),
+      width: 320,
+      onOpenHouse: () => opened++,
+    );
+    expect(find.byTooltip('Apri la casa'), findsOneWidget);
+    expect(opened, 0);
+    await tester.tap(find.byTooltip('Apri la casa'));
+    expect(opened, 1);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('risposta senza selezione mantiene Rispondi', (tester) async {
     final item = honooItem(HonooType.answer);

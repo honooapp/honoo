@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../Entities/casa_share_mode.dart';
+import 'chest_page.dart';
 import '../Services/house_guests_service.dart';
 import '../UI/hinoo_viewer.dart';
 import '../UI/honoo_card.dart';
@@ -131,35 +132,52 @@ class _HouseGuestsPageState extends State<HouseGuestsPage> {
                             child: SizedBox(
                               width: 112,
                               height: 168,
-                              child: Semantics(
-                                label: guest.honoo != null
-                                    ? 'honoo ricevuto'
-                                    : 'hinoo ricevuto',
-                                child: IgnorePointer(
-                                  child: ClipRect(
-                                    child: FittedBox(
-                                      fit: BoxFit.contain,
-                                      child: SizedBox(
-                                        width: 360,
-                                        height: 540,
-                                        child: guest.honoo != null
-                                            ? HonooCard(honoo: guest.honoo!)
-                                            : guest.hinoo != null
-                                            ? HinooViewer(
-                                                key: ValueKey(guest.id),
-                                                draft: guest.hinoo!,
-                                                maxWidth: 360,
-                                                maxHeight: 540,
-                                              )
-                                            : const Center(
-                                                child: Text(
-                                                  'Contenuto non disponibile',
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(
-                                                    color: Colors.white,
+                              child: GestureDetector(
+                                onTap: guest.conversationId == null
+                                    ? null
+                                    : () async {
+                                        await Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => ChestPage(
+                                              focusConversationId:
+                                                  guest.conversationId,
+                                              focusReplyId: guest.contentId,
+                                            ),
+                                          ),
+                                        );
+                                        if (mounted) await _load();
+                                      },
+                                child: Semantics(
+                                  button: guest.conversationId != null,
+                                  label: guest.honoo != null
+                                      ? 'honoo ricevuto'
+                                      : 'hinoo ricevuto',
+                                  child: IgnorePointer(
+                                    child: ClipRect(
+                                      child: FittedBox(
+                                        fit: BoxFit.contain,
+                                        child: SizedBox(
+                                          width: 360,
+                                          height: 540,
+                                          child: guest.honoo != null
+                                              ? HonooCard(honoo: guest.honoo!)
+                                              : guest.hinoo != null
+                                              ? HinooViewer(
+                                                  key: ValueKey(guest.id),
+                                                  draft: guest.hinoo!,
+                                                  maxWidth: 360,
+                                                  maxHeight: 540,
+                                                )
+                                              : const Center(
+                                                  child: Text(
+                                                    'Contenuto non disponibile',
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -169,37 +187,45 @@ class _HouseGuestsPageState extends State<HouseGuestsPage> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        for (final mode in CasaShareMode.values)
-                          Semantics(
-                            selected: guest.modes.contains(mode),
-                            button: true,
-                            label:
-                                '${mode.label}: ${guest.modes.contains(mode) ? "accesso dato" : "accesso non dato"}',
-                            child: IconButton(
-                              key: ValueKey('guest-${guest.id}-${mode.name}'),
-                              tooltip:
-                                  '${guest.modes.contains(mode) ? "Revoca" : "Consenti"}: ${mode.label}',
-                              onPressed: _saving.contains(guest.id)
-                                  ? null
-                                  : () => _toggle(guest, mode),
-                              iconSize: 36,
-                              icon: Opacity(
-                                opacity: guest.modes.contains(mode) ? 1 : 0.25,
-                                child: SvgPicture.asset(
-                                  switch (mode) {
-                                    CasaShareMode.home =>
-                                      'assets/icons/honoo_chest_blue.svg',
-                                    CasaShareMode.moon =>
-                                      'assets/icons/honoo_chest_white.svg',
-                                    CasaShareMode.all =>
-                                      'assets/icons/chest_home.svg',
-                                  },
-                                  width: 36,
-                                  height: 36,
+                        if (guest.pending)
+                          const Text(
+                            'Richiesta di accesso',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        if (!guest.pending)
+                          for (final mode in CasaShareMode.values)
+                            Semantics(
+                              selected: guest.modes.contains(mode),
+                              button: true,
+                              label:
+                                  '${mode.label}: ${guest.modes.contains(mode) ? "accesso dato" : "accesso non dato"}',
+                              child: IconButton(
+                                key: ValueKey('guest-${guest.id}-${mode.name}'),
+                                tooltip:
+                                    '${guest.modes.contains(mode) ? "Revoca" : "Consenti"}: ${mode.label}',
+                                onPressed: _saving.contains(guest.id)
+                                    ? null
+                                    : () => _toggle(guest, mode),
+                                iconSize: 36,
+                                icon: Opacity(
+                                  opacity: guest.modes.contains(mode)
+                                      ? 1
+                                      : 0.25,
+                                  child: SvgPicture.asset(
+                                    switch (mode) {
+                                      CasaShareMode.home =>
+                                        'assets/icons/honoo_chest_blue.svg',
+                                      CasaShareMode.moon =>
+                                        'assets/icons/honoo_chest_white.svg',
+                                      CasaShareMode.all =>
+                                        'assets/icons/chest_home.svg',
+                                    },
+                                    width: 36,
+                                    height: 36,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
                       ],
                     );
                   },

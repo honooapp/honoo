@@ -74,7 +74,7 @@ class CampanelliFooter extends StatelessWidget {
                   height: iconSize,
                   fit: BoxFit.contain,
                 ),
-                if (hasPendingKnock)
+                if (hasPendingKnock && pendingKnockCount > 0)
                   Positioned(
                     top: -4,
                     right: -4,
@@ -110,11 +110,12 @@ class CampanelliFooter extends StatelessWidget {
                   height: iconSize,
                   fit: BoxFit.contain,
                 ),
-                Positioned(
-                  top: -4,
-                  right: -4,
-                  child: _PendingKnockBadge(count: pendingKnockCount),
-                ),
+                if (pendingKnockCount > 0)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: _PendingKnockBadge(count: pendingKnockCount),
+                  ),
               ],
             ),
           ),
@@ -149,10 +150,7 @@ class _PendingKnockBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.redAccent,
         borderRadius: BorderRadius.circular(size / 2),
-        border: Border.all(
-          color: HonooColor.background,
-          width: 1.5,
-        ),
+        border: Border.all(color: HonooColor.background, width: 1.5),
       ),
       child: Center(
         child: Text(

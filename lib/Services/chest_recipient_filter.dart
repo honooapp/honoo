@@ -16,6 +16,14 @@ Future<String> chestRecipientFilter(
     final address = row['address']?.toString();
     if (address != null && address.isNotEmpty) identities.add(address);
   }
+  final houses = await client
+      .from('case')
+      .select('campanello_hinoo_id')
+      .eq('owner_id', userId);
+  for (final house in houses) {
+    final tag = house['campanello_hinoo_id']?.toString();
+    if (tag != null && tag.isNotEmpty) identities.add(tag);
+  }
   if (identities.length == 1) return 'recipient_tag.eq.$userId';
   return 'recipient_tag.in.(${identities.map(jsonEncode).join(',')})';
 }

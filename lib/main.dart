@@ -1,3 +1,4 @@
+import 'Utility/home_navigation_signal.dart';
 import 'Widgets/action_animation_host.dart';
 import 'Widgets/activity_tracker.dart';
 import 'package:flutter/material.dart';
@@ -137,6 +138,7 @@ class _MyAppState extends State<MyApp> {
       builder: (context, orientation, deviceType) {
         final Widget app = MaterialApp(
           navigatorKey: _navigatorKey,
+          navigatorObservers: [homeRouteObserver],
           title: 'honoo',
           theme: ThemeData(
             tooltipTheme: TooltipThemeData(

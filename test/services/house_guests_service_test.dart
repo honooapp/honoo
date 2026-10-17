@@ -6,6 +6,27 @@ import '../test_supabase_helper.dart';
 
 void main() {
   setUpAll(registerSupabaseFallbacks);
+  test('pending requests retain their exact conversation and message', () {
+    for (final kind in ['honoo', 'hinoo']) {
+      final request = HouseGuest.fromJson({
+        'id': 7,
+        'granted_at': null,
+        'target_house_tag': 'house',
+        'share_modes': [],
+        kind: {
+          'id': 'message',
+          'conversation_id': 'conversation',
+          'pages': [
+            {'text': 'Ciao'},
+          ],
+        },
+      });
+      expect(request.pending, isTrue);
+      expect(request.modes, isEmpty);
+      expect(request.conversationId, 'conversation');
+      expect(request.contentId, 'message');
+    }
+  });
   test('mantiene ospiti revocati e contenuti non più disponibili', () async {
     final harness = SupabaseTestHarness(withAuthenticatedUser: true);
     final rpc = MockQueryChain();
@@ -21,7 +42,7 @@ void main() {
     );
     when(
       () => harness.client.rpc(
-        'get_house_guests',
+        'get_house_inbox',
         params: {'p_house_tag': 'house'},
       ),
     ).thenAnswer((_) => rpc);

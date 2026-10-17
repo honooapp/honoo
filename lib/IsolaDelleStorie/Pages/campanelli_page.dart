@@ -1,3 +1,5 @@
+import '../../Pages/casa_share_selection_page.dart';
+import '../../Utility/reply_notification_signal.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -16,7 +18,6 @@ import 'package:honoo/Entities/campanelli_view_data.dart';
 import 'package:honoo/Entities/pending_knock.dart';
 import 'package:honoo/Services/supabase_provider.dart';
 import 'package:honoo/Services/app_failure.dart';
-import 'package:honoo/Controller/hinoo_controller.dart';
 import 'package:honoo/Controller/campanelli_controller.dart';
 import 'package:honoo/UI/hinoo_typography.dart';
 import 'package:honoo/Utility/honoo_colors.dart';
@@ -27,9 +28,7 @@ import 'package:honoo/Widgets/campanelli_footer.dart';
 import 'package:honoo/Widgets/campanello_card.dart';
 import 'package:honoo/Widgets/casa_section.dart';
 import 'package:honoo/Widgets/house_invite_dialogs.dart';
-import 'package:honoo/Widgets/pending_knocks_dialog.dart';
 import 'package:honoo/Entities/honoo.dart';
-import 'package:honoo/Controller/honoo_controller.dart';
 import 'package:honoo/Widgets/desktop_carousel_arrows.dart';
 import 'package:honoo/Widgets/busy_overlay.dart';
 import 'package:honoo/Services/campanelli_repository.dart';
@@ -39,15 +38,12 @@ import 'package:honoo/Services/house_invite_service.dart';
 import '../../Pages/home_page.dart';
 import '../../Pages/email_login_page.dart';
 import '../../Pages/casa_builder_page.dart';
-import '../../Pages/casa_share_selection_page.dart';
 import '../../Pages/chest_page.dart';
 import '../../Pages/shared_house_chest_page.dart';
 import '../../Pages/new_hinoo_page.dart';
 import '../../Pages/new_honoo_page.dart';
 import '../../Pages/house_guests_page.dart';
 import '../../Widgets/house_knock_dialog.dart';
-import 'pending_hinoo_page.dart';
-import 'pending_honoo_page.dart';
 
 class CampanelliPage extends StatefulWidget {
   const CampanelliPage({super.key, this.openOwnHouse = false});
@@ -89,6 +85,7 @@ class _CampanelliPageState extends State<CampanelliPage>
   Timer? _accessRefreshTimer;
   bool _refreshingAccess = false;
   bool _isShowingKnockRequest = false;
+  final Set<String> _promptedKnockIds = {};
   final Set<String> _shownKnockRequestIds = <String>{};
   bool get _hasOwnHouse => _campanelliController.state.hasOwnHouse;
   bool get _hasPendingOrAcceptedInvite =>
@@ -167,6 +164,7 @@ class _CampanelliPageState extends State<CampanelliPage>
   @override
   void initState() {
     super.initState();
+    ReplyNotificationSignal.revision.addListener(_reloadSeenKnocks);
     WidgetsBinding.instance.addObserver(this);
     _accessRefreshTimer = Timer.periodic(
       const Duration(seconds: 15),
@@ -464,15 +462,6 @@ class _CampanelliPageState extends State<CampanelliPage>
       0,
       duration: _kHouseSlideDuration,
       curve: _kCurve,
-    );
-  }
-
-  Future<Set<CasaShareMode>?> _showOwnerMultiShareDialog() {
-    return Navigator.of(context).push<Set<CasaShareMode>>(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => const CasaShareSelectionPage(),
-      ),
     );
   }
 
@@ -1042,6 +1031,13 @@ class _CampanelliPageState extends State<CampanelliPage>
     }
   }
 
+  Future<void> _reloadSeenKnocks() async {
+    final uid = SupabaseProvider.client.auth.currentUser?.id;
+    if (uid == null) return;
+    final seen = await KnocksSeenTracker.load(uid);
+    if (mounted) setState(() => _shownKnockRequestIds.addAll(seen));
+  }
+
   Future<void> _showKnockRequestOnce(PendingKnock knock) async {
     if (!mounted || _isShowingKnockRequest) return;
     final userId = SupabaseProvider.client.auth.currentUser?.id;
@@ -1051,205 +1047,48 @@ class _CampanelliPageState extends State<CampanelliPage>
       final seen = await KnocksSeenTracker.load(userId);
       if (!mounted) return;
       setState(() => _shownKnockRequestIds.addAll(seen));
-      final queued = {
-        for (final item in _pendingKnocks) item.id: item,
-        knock.id: knock,
-      }.values.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      for (final item in queued) {
-        if (!mounted ||
-            SupabaseProvider.client.auth.currentUser?.id != userId) {
-          return;
-        }
-        if (_shownKnockRequestIds.contains(item.id)) {
-          continue;
-        }
-        await _openPendingKnock(item);
+      if (_shownKnockRequestIds.contains(knock.id) ||
+          !_promptedKnockIds.add(knock.id)) {
+        return;
       }
+      final view = await showDialog<bool>(
+        context: context,
+        builder: (_) => const HonooConfirmDialog(
+          title: 'Hai nuove richieste di accesso alla casa.',
+          confirmLabel: 'Visualizza',
+          cancelLabel: 'Ignora',
+        ),
+      );
+      if (view == true && mounted) await _openPendingKnocksDialog();
     } finally {
       _isShowingKnockRequest = false;
     }
   }
 
-  Future<T?> _trackKnockView<T>(PendingKnock knock, Future<T?> opened) async {
-    final userId = SupabaseProvider.client.auth.currentUser?.id;
-    await WidgetsBinding.instance.endOfFrame;
-    if (mounted && userId != null) {
-      setState(() => _shownKnockRequestIds.add(knock.id));
-      await KnocksSeenTracker.mark(userId, knock.id);
-    }
-    return opened;
-  }
-
-  _CampanelloEntry? _entryForTag(String? tag) {
-    if (tag == null || tag.isEmpty) return null;
-    for (final entry in _userEntries) {
-      if (entry.campanello.campanelloHinooId == tag) return entry;
-    }
-    return null;
-  }
-
-  String _pendingLabelForTag(String? tag) {
-    final entry = _entryForTag(tag);
-    if (entry == null) return 'Campanello';
-    final String raw = entry.campanello.text.trim();
-    if (raw.isEmpty) return 'Campanello';
-    final String firstLine = raw.split('\n').first.trim();
-    return firstLine.isEmpty ? 'Campanello' : firstLine;
-  }
-
-  String _formatPendingTimestamp(DateTime ts) {
-    final DateTime local = ts.toLocal();
-    String two(int value) => value.toString().padLeft(2, '0');
-    return '${two(local.day)}/${two(local.month)}/${local.year} '
-        '${two(local.hour)}:${two(local.minute)}';
-  }
-
-  Future<void> _approvePendingKnock(
-    PendingKnock knock,
-    _CampanelloEntry entry, {
-    HinooDraft? draft,
-    Honoo? honoo,
-  }) async {
-    final Set<CasaShareMode>? modes = await _showOwnerMultiShareDialog();
-    if (modes == null || modes.isEmpty || !mounted) return;
-    _showBusyOverlay('Apro la casa...');
-    try {
-      final user = SupabaseProvider.client.auth.currentUser;
-      final campanelloHinooId = entry.campanello.campanelloHinooId;
-      if (user == null || campanelloHinooId == null) return;
-      try {
-        await _campanelliController.approvePendingKnock(
-          knockId: knock.id,
-          shareModes: modes.map((mode) => mode.dbValue).toList(growable: false),
-        );
-        if (mounted) {
-          setState(() {});
-        }
-      } catch (e) {
-        debugPrint('house_access grant error: $e');
-        if (mounted) {
-          showHonooToast(context, message: 'Operazione non riuscita. Ritenta.');
-        }
-        return;
-      }
-    } finally {
-      _hideBusyOverlay();
-    }
-
-    if (draft != null) {
-      try {
-        final HinooDraft personalDraft = draft.copyWith(
-          type: HinooType.personal,
-          recipientTag: null,
-        );
-        await HinooController().saveToChest(personalDraft);
-      } catch (error, stackTrace) {
-        debugPrint(
-          '[Campanelli] save hinoo failed: ${AppFailure.from(error, stackTrace)}',
-        );
-      }
-    }
-
-    if (honoo != null) {
-      try {
-        await HonooController().saveToChest(honoo);
-      } catch (error, stackTrace) {
-        debugPrint(
-          '[Campanelli] save honoo failed: ${AppFailure.from(error, stackTrace)}',
-        );
-      }
-    }
-
-    if (!mounted) return;
-    setState(() {});
-    showHonooToast(context, message: 'Casa aperta.');
-    // Light haptic on owner approval as further confirmation
-    try {
-      HapticFeedback.lightImpact();
-    } catch (error, stackTrace) {
-      debugPrint(
-        '[Campanelli] haptic failed: ${AppFailure.from(error, stackTrace)}',
-      );
-    }
-  }
-
-  Future<void> _openPendingKnock(PendingKnock knock) async {
-    final entry = _entryForTag(knock.targetTag);
-    if (entry == null) return;
-    if (knock.hinooId == null && knock.honooId == null) {
-      final bool? openHouse = await _trackKnockView(
-        knock,
-        showDialog<bool>(
-          context: context,
-          barrierDismissible: true,
-          builder: (_) => const HonooConfirmDialog(
-            title: 'Qualcuno sta bussando alla tua casa, vuoi farlo entrare?',
-            confirmLabel: 'Sì',
-            cancelLabel: 'No',
-          ),
-        ),
-      );
-
-      if (openHouse == true && mounted) {
-        await _approvePendingKnock(knock, entry);
-      }
-      return;
-    }
-
-    if (knock.hinooId != null && knock.hinooId!.isNotEmpty) {
-      final draft = await _campanelliController.fetchPendingHinoo(
-        knock.hinooId!,
-      );
-      if (draft == null || !mounted) return;
-      final bool? approved = await _trackKnockView(
-        knock,
-        Navigator.of(context).push<bool>(
-          MaterialPageRoute(builder: (_) => PendingHinooPage(draft: draft)),
-        ),
-      );
-
-      if (approved == true && mounted) {
-        await _approvePendingKnock(knock, entry, draft: draft);
-      }
-      return;
-    }
-
-    if (knock.honooId != null && knock.honooId!.isNotEmpty) {
-      final honoo = await _campanelliController.fetchPendingHonoo(
-        knock.honooId!,
-      );
-      if (honoo == null || !mounted) return;
-      final bool? approved = await _trackKnockView(
-        knock,
-        Navigator.of(context).push<bool>(
-          MaterialPageRoute(builder: (_) => PendingHonooPage(honoo: honoo)),
-        ),
-      );
-
-      if (approved == true && mounted) {
-        await _approvePendingKnock(knock, entry, honoo: honoo);
-      }
-    }
-  }
-
   Future<void> _openPendingKnocksDialog() async {
-    if (_pendingKnocks.isEmpty) return;
-    final List<PendingKnock> sorted = List<PendingKnock>.from(_pendingKnocks)
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => PendingKnocksDialog(
-        knocks: sorted,
-        labelForKnock: (knock) => _pendingLabelForTag(knock.targetTag),
-        timestampForKnock: (knock) => _formatPendingTimestamp(knock.createdAt),
-        onOpen: _openPendingKnock,
-      ),
-    );
+    final own = _userEntries
+        .where(
+          (e) =>
+              e.campanello.ownerId ==
+              SupabaseProvider.client.auth.currentUser?.id,
+        )
+        .firstOrNull;
+    final tag = own?.campanello.campanelloHinooId;
+    if (tag == null) return;
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => HouseGuestsPage(houseTag: tag)));
+    final uid = SupabaseProvider.client.auth.currentUser?.id;
+    if (uid != null) {
+      final seen = await KnocksSeenTracker.load(uid);
+      if (mounted) setState(() => _shownKnockRequestIds.addAll(seen));
+    }
+    await _refreshAccess();
   }
 
   @override
   void dispose() {
+    ReplyNotificationSignal.revision.removeListener(_reloadSeenKnocks);
     _carouselHintTimer?.cancel();
     _realtimeEventsSubscription.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -1610,16 +1449,11 @@ class _CampanelliPageState extends State<CampanelliPage>
                                 onEditTextTap: isOwnCampanello
                                     ? () => _editCasaText(houseEntry)
                                     : null,
+                                pendingRequestCount: isOwnCampanello
+                                    ? pendingKnockCount
+                                    : 0,
                                 onGuestsTap: isOwnCampanello
-                                    ? () => Navigator.of(context).push<void>(
-                                        MaterialPageRoute(
-                                          builder: (_) => HouseGuestsPage(
-                                            houseTag: houseEntry
-                                                .campanello
-                                                .campanelloHinooId!,
-                                          ),
-                                        ),
-                                      )
+                                    ? _openPendingKnocksDialog
                                     : null,
                                 onEditTap: isOwnCampanello
                                     ? () => _editCasa(houseEntry)
@@ -1642,16 +1476,11 @@ class _CampanelliPageState extends State<CampanelliPage>
                                 onEditTextTap: isOwnCampanello
                                     ? () => _editCasaText(houseEntry)
                                     : null,
+                                pendingRequestCount: isOwnCampanello
+                                    ? pendingKnockCount
+                                    : 0,
                                 onGuestsTap: isOwnCampanello
-                                    ? () => Navigator.of(context).push<void>(
-                                        MaterialPageRoute(
-                                          builder: (_) => HouseGuestsPage(
-                                            houseTag: houseEntry
-                                                .campanello
-                                                .campanelloHinooId!,
-                                          ),
-                                        ),
-                                      )
+                                    ? _openPendingKnocksDialog
                                     : null,
                                 onEditTap: isOwnCampanello
                                     ? () => _editCasa(houseEntry)

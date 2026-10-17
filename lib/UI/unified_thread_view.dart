@@ -1,4 +1,5 @@
 import '../Widgets/saved_content_edit_frame.dart';
+import '../Utility/knocks_seen_tracker.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -403,6 +404,17 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
     try {
       if (entry.id?.isNotEmpty == true) {
         await RepliesSeenTracker.markReply(userId: userId, replyId: entry.id!);
+        final recipient =
+            entry.honoo?.recipientTag ?? entry.hinoo?.recipientTag;
+        if (recipient != null && recipient != userId) {
+          final knocks = await SupabaseProvider.client
+              .from('house_access')
+              .select('id')
+              .eq(entry.honoo != null ? 'honoo_id' : 'hinoo_id', entry.id!);
+          for (final knock in knocks) {
+            await KnocksSeenTracker.mark(userId, knock['id'].toString());
+          }
+        }
       }
     } catch (error) {
       debugPrint('Unable to persist displayed reply: $error');

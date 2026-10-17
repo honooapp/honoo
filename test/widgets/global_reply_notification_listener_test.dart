@@ -1,3 +1,4 @@
+import 'package:honoo/Utility/home_navigation_signal.dart';
 import 'dart:async';
 import 'package:mocktail/mocktail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -226,6 +227,20 @@ void main() {
     expect(find.text('Luna'), findsOneWidget);
     expect(notification.showCount, 1);
     expect(notification.onTap, isNotNull);
+    homeEntryRevision.value++;
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(find.text('Ignora'), findsOneWidget);
+    await tester.tap(find.text('Ignora'));
+    await tester.pumpAndSettle();
+    await RepliesSeenTracker.markReply(
+      userId: 'test_user',
+      replyId: 'reply-pending',
+    );
+    homeEntryRevision.value++;
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(find.text('Ignora'), findsNothing);
     final seenState = await RepliesSeenTracker.load(userId: 'test_user');
     expect(
       seenState.isSeen(

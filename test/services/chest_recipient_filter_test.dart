@@ -15,6 +15,17 @@ void main() {
           'https://example.test',
           'test-key',
           httpClient: MockClient((request) async {
+            if (request.url.path == '/rest/v1/case') {
+              expect(request.url.queryParameters['owner_id'], 'eq.user-1');
+              return http.Response(
+                jsonEncode([
+                  {'campanello_hinoo_id': 'house-tag'},
+                ]),
+                200,
+                request: request,
+                headers: {'content-type': 'application/json'},
+              );
+            }
             expect(request.url.path, '/rest/v1/users');
             expect(request.url.queryParameters['select'], 'address');
             // Model the deployed schema: auth_id is not a valid column.
@@ -25,7 +36,7 @@ void main() {
                   'message': 'column users.auth_id does not exist',
                 }),
                 400,
-              request: request,
+                request: request,
               );
             }
             expect(request.url.queryParameters['auth_user_id'], 'eq.user-1');
@@ -38,7 +49,7 @@ void main() {
                     : [],
               ),
               200,
-            request: request,
+              request: request,
               headers: {'content-type': 'application/json'},
             );
           }),
@@ -47,8 +58,8 @@ void main() {
         expect(
           await chestRecipientFilter(client, 'user-1'),
           hasAddress
-              ? 'recipient_tag.in.("user-1","casa-storica")'
-              : 'recipient_tag.eq.user-1',
+              ? 'recipient_tag.in.("user-1","casa-storica","house-tag")'
+              : 'recipient_tag.in.("user-1","house-tag")',
         );
       },
     );

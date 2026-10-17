@@ -29,8 +29,10 @@ class ChestFooter extends StatelessWidget {
     this.foregroundColor = HonooColor.onBackground,
     this.isAdmin = false,
     this.isConversation = false,
+    this.onOpenHouse,
   });
 
+  final VoidCallback? onOpenHouse;
   final bool isAdmin;
   final bool isConversation;
   final ChestItem? item;
@@ -83,6 +85,16 @@ class ChestFooter extends StatelessWidget {
       );
     }
 
+    if (onOpenHouse != null) {
+      actions.add(
+        _action(
+          asset: 'assets/icons/ospiti.svg',
+          label: 'Apri la casa',
+          tooltip: 'Apri la casa',
+          onPressed: onOpenHouse!,
+        ),
+      );
+    }
     return ResponsiveFooterBar(
       useSafeArea: false,
       bottomPadding: bottomPadding,
@@ -92,6 +104,8 @@ class ChestFooter extends StatelessWidget {
       // Reserve each action's position while the selected thread is loading.
       // Hidden slots have no button, tooltip or accessibility action.
       actions: [
+        if (onOpenHouse != null)
+          actions.firstWhere((a) => a.tooltip == 'Apri la casa'),
         for (final tooltip in const [
           'Home',
           'Info',

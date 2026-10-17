@@ -1,3 +1,6 @@
+import '../Utility/home_navigation_signal.dart';
+import '../Utility/knocks_seen_tracker.dart';
+import '../Services/house_guests_service.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -24,7 +27,31 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+class _HomePageState extends State<HomePage>
+    with WidgetsBindingObserver, RouteAware {
+  int _houseRequestCount = 0;
+  PageRoute<dynamic>? _homeRoute;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute && route != _homeRoute) {
+      homeRouteObserver.unsubscribe(this);
+      _homeRoute = route;
+      homeRouteObserver.subscribe(this, route);
+    }
+  }
+
+  void _onHomeEntry() {
+    if (!mounted) return;
+    homeEntryRevision.value++;
+    _loadReplyCount();
+  }
+
+  @override
+  void didPopNext() => _onHomeEntry();
+
   int _replyCount = 0;
   Timer? _replyRefreshTimer;
   bool _visitRecorded = false;
@@ -35,7 +62,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadReplyCount();
+      _onHomeEntry();
       _recordVisit();
     });
     _replyRefreshTimer = Timer.periodic(
@@ -47,6 +74,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    homeRouteObserver.unsubscribe(this);
     WidgetsBinding.instance.removeObserver(this);
     _replyRefreshTimer?.cancel();
     ReplyNotificationSignal.revision.removeListener(_loadReplyCount);
@@ -57,9 +85,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final generation = ++_replyLoadGeneration;
     final user = SupabaseProvider.client.auth.currentUser;
     if (user == null) {
-      if (mounted && _replyCount != 0) setState(() => _replyCount = 0);
+      if (mounted) {
+        setState(() {
+          _replyCount = 0;
+          _houseRequestCount = 0;
+        });
+      }
       return;
     }
+    unawaited(_loadHouseRequests(user.id, generation));
     try {
       final count = await widget.homeService.fetchUnreadReplyCount(user.id);
       if (!mounted || generation != _replyLoadGeneration) return;
@@ -73,6 +107,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         error: error,
         stackTrace: stackTrace,
       );
+    }
+  }
+
+  Future<void> _loadHouseRequests(String userId, int generation) async {
+    try {
+      final requests = await HouseGuestsService().fetch();
+      final seen = await KnocksSeenTracker.load(userId);
+      if (!mounted || generation != _replyLoadGeneration) return;
+      setState(
+        () => _houseRequestCount = requests
+            .where((r) => r.pending && !seen.contains(r.id))
+            .length,
+      );
+    } catch (error) {
+      debugPrint('[Home] House requests unavailable: $error');
     }
   }
 
@@ -146,7 +195,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
 
                   // FOOTER sostituito col widget riutilizzabile
-                  SeaFooterBar(replyCount: _replyCount, showHouseEntry: true),
+                  SeaFooterBar(
+                    replyCount: _replyCount,
+                    houseRequestCount: _houseRequestCount,
+                    showHouseEntry: true,
+                  ),
                 ],
               ),
 

@@ -17,10 +17,12 @@ class SeaFooterBar extends StatelessWidget {
   const SeaFooterBar({
     super.key,
     this.replyCount = 0,
+    this.houseRequestCount = 0,
     this.showHouseEntry = false,
   });
 
   final int replyCount;
+  final int houseRequestCount;
   final bool showHouseEntry;
 
   /// Altezza fissa come in HomePage
@@ -186,11 +188,22 @@ class SeaFooterBar extends StatelessWidget {
                     ),
                     padding: EdgeInsets.zero,
                     iconSize: 27.5,
-                    icon: SvgPicture.asset(
-                      'assets/icons/ospiti.svg',
-                      width: 27.5,
-                      height: 27.5,
-                      semanticsLabel: 'La tua casa',
+                    icon: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        SvgPicture.asset(
+                          'assets/icons/ospiti.svg',
+                          width: 27.5,
+                          height: 27.5,
+                          semanticsLabel: 'La tua casa',
+                        ),
+                        if (houseRequestCount > 0)
+                          Positioned(
+                            right: -12,
+                            top: -12,
+                            child: _ReplyBadge(count: houseRequestCount),
+                          ),
+                      ],
                     ),
                     onPressed: () async {
                       final loggedIn =

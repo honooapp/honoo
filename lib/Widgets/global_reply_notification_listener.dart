@@ -1,3 +1,4 @@
+import '../Utility/home_navigation_signal.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -67,10 +68,30 @@ class _GlobalReplyNotificationListenerState
   final Map<DialogRoute<bool>, List<ReplyNotificationEvent>> _dialogEvents = {};
   bool _openingReplies = false;
 
+  bool _homeReplayPending = false;
+
+  void _onHomeEntry() {
+    if (!mounted || !widget.enabled || _notificationDialogs.isNotEmpty) return;
+    if (_catchUpInFlightGeneration != null) {
+      _homeReplayPending = true;
+      return;
+    }
+    _deliveredEventKeys.clear();
+    _lastCatchUpAt = null;
+    for (final event in _shownEvents.values.toList()) {
+      _handleEvent(event);
+    }
+    final userId = _activeUserId;
+    if (userId != null && widget.replyEventStream == null) {
+      unawaited(_catchUpMissedReplies(userId, _channelGeneration));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    homeEntryRevision.addListener(_onHomeEntry);
     ReplyNotificationSignal.revision.addListener(_reconcileSeenNotifications);
     if (widget.enabled) _start();
   }
@@ -463,6 +484,10 @@ class _GlobalReplyNotificationListenerState
     } finally {
       if (_catchUpInFlightGeneration == generation) {
         _catchUpInFlightGeneration = null;
+        if (_homeReplayPending) {
+          _homeReplayPending = false;
+          _onHomeEntry();
+        }
       }
     }
   }
@@ -564,6 +589,7 @@ class _GlobalReplyNotificationListenerState
 
   @override
   void dispose() {
+    homeEntryRevision.removeListener(_onHomeEntry);
     WidgetsBinding.instance.removeObserver(this);
     ReplyNotificationSignal.revision.removeListener(
       _reconcileSeenNotifications,

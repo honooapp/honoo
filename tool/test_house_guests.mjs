@@ -38,6 +38,12 @@ try {
   `);
   await db.exec(await readFile(new URL('../supabase/migrations/20261013120000_house_guests_permissions.sql', import.meta.url), 'utf8'));
   await db.exec(await readFile(new URL('../supabase/migrations/20261013150000_house_guest_first_content.sql', import.meta.url), 'utf8'));
+  await db.exec(`
+    create table public.users(auth_user_id uuid, address text);
+    alter table public.honoo add column conversation_id text default 'honoo-conversation';
+    alter table public.hinoo add column conversation_id text default 'hinoo-conversation';
+  `);
+  await db.exec(await readFile(new URL('../supabase/migrations/20261017120000_house_request_conversations.sql', import.meta.url), 'utf8'));
   await login(owner);
   await db.exec('set role authenticated');
   const legacyGuests = (await db.query('select * from public.get_house_guests($1)', ['00000000-0000-0000-0000-000000000099'])).rows;
@@ -54,7 +60,18 @@ try {
   await assert.rejects(() => insert(',honoo_id,share_modes', `,'${content}',array['all']`), /row-level security/);
   await insert(',honoo_id', `,'${content}'`);
   await insert(',hinoo_id', `,'${content}'`);
+  await login(owner);
+  const inbox = (await db.query('select * from public.get_house_inbox($1)', [house])).rows;
+  assert.equal(inbox.length, 2);
+  assert.ok(inbox.every(row => row.granted_at === null && row.share_modes.length === 0));
+  assert.equal(inbox[0].honoo.text, 'Bussata');
+  assert.equal(inbox[1].hinoo.pages[0].text, 'Bussata hinoo');
+  for (const conversation of ['honoo-conversation', 'hinoo-conversation']) {
+    assert.equal((await db.query('select public.is_conversation_participant($1) allowed', [conversation])).rows[0].allowed, true);
+  }
   await login(stranger);
+  assert.equal((await db.query('select * from public.get_house_inbox()')).rows.length, 0);
+  assert.equal((await db.query("select public.is_conversation_participant('honoo-conversation') allowed")).rows[0].allowed, false);
   await assert.rejects(() => insert(',honoo_id', `,'${content}'`), /row-level security/);
   assert.equal((await db.query('select * from public.get_house_guests($1)', [house])).rows.length, 0);
   await assert.rejects(() => db.query("select public.update_house_guest_access(4,array['all'])"), /not found/);
