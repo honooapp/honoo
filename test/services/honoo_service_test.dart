@@ -59,6 +59,11 @@ void main() {
     when(() => client.from('users')).thenAnswer((_) => users);
     when(() => users.select(any())).thenAnswer((_) => users);
     when(() => users.eq(any(), any())).thenAnswer((_) => users);
+    final houses = _MockQueryChain();
+    houses.queueResponse(<Map<String, dynamic>>[]);
+    when(() => client.from('case')).thenAnswer((_) => houses);
+    when(() => houses.select(any())).thenAnswer((_) => houses);
+    when(() => houses.eq(any(), any())).thenAnswer((_) => houses);
     chain = _MockQueryChain();
     hiddenConversations = _MockQueryChain();
     auth = _MockAuth();

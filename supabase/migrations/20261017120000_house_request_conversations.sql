@@ -1,3 +1,5 @@
+-- Deploy before the house-request UI: owners must be able to read and reply
+-- to a request without granting house access. Approval remains a separate RPC.
 create or replace function public.is_conversation_participant(
   target_conversation_id text
 )
