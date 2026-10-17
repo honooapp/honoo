@@ -21,6 +21,113 @@ void main() {
     resetMocktailState();
   });
 
+  Map<String, dynamic> historyRow(
+    String id, {
+    String? parent,
+    String? conversation,
+    bool deleted = false,
+  }) => {
+    'id': id,
+    'text': id,
+    'pages': [
+      {'text': id},
+    ],
+    'destination': parent == null ? 'chest' : 'reply',
+    'type': parent == null ? 'personal' : 'answer',
+    'reply_to': parent,
+    'conversation_id': conversation,
+    'created_at': '2026-01-01T10:00:00Z',
+    'user_id': 'test_user',
+    if (deleted) 'admin_deleted_at': '2026-01-02T10:00:00Z',
+  };
+
+  test(
+    'recupera tutti gli antenati misti anche riaprendo lo scrigno',
+    () async {
+      final honoo = harness.stubTable('honoo');
+      final hinoo = harness.stubTable('hinoo');
+      // Repeat the same read: no local notification or new write is required.
+      for (var opening = 0; opening < 2; opening++) {
+        honoo.queueResponse([
+          historyRow('last', parent: 'middle', conversation: 'current'),
+        ]);
+        hinoo.queueResponse([]);
+        honoo.queueResponse([]);
+        hinoo.queueResponse([
+          historyRow('middle', parent: 'root', conversation: 'older'),
+        ]);
+        honoo.queueResponse([historyRow('root', conversation: 'original')]);
+        hinoo.queueResponse([]);
+        final entries = await ConversationService.fetchConversation('current');
+        expect(entries.map((entry) => entry.id), ['root', 'middle', 'last']);
+        expect(entries[1].kind, ConversationEntryKind.hinoo);
+      }
+      // Only descendants without a conversation id are eligible; never merge
+      // the other dialogs attached to the shared root.
+      verifyNever(() => honoo.in_('reply_to', ['root']));
+      verifyNever(() => hinoo.in_('reply_to', ['middle']));
+    },
+  );
+
+  test('recupera risposte legacy annidate Honoo e Hinoo', () async {
+    final honoo = harness.stubTable('honoo');
+    final hinoo = harness.stubTable('hinoo');
+    honoo.queueResponse([historyRow('root')]);
+    hinoo.queueResponse([]);
+    honoo.queueResponse([]);
+    hinoo.queueResponse([historyRow('middle', parent: 'root')]);
+    honoo.queueResponse([historyRow('last', parent: 'middle')]);
+    hinoo.queueResponse([]);
+
+    final entries = await ConversationService.fetchConversation('root');
+    expect(entries.map((entry) => entry.id), ['root', 'middle', 'last']);
+    verify(() => honoo.in_('reply_to', ['middle'])).called(1);
+    verify(() => hinoo.is_('conversation_id', null)).called(3);
+  });
+
+  test(
+    'termina su cicli e genitori mancanti senza duplicare messaggi',
+    () async {
+      final honoo = harness.stubTable('honoo');
+      final hinoo = harness.stubTable('hinoo');
+      honoo.queueResponse([
+        historyRow('last', parent: 'middle', conversation: 'current'),
+        historyRow('orphan', parent: 'unavailable', conversation: 'current'),
+      ]);
+      hinoo.queueResponse([]);
+      honoo.queueResponse([
+        historyRow('middle', parent: 'last', conversation: 'older'),
+        historyRow('last', parent: 'middle', conversation: 'current'),
+      ]);
+      hinoo.queueResponse([]);
+
+      final entries = await ConversationService.fetchConversation('current');
+      expect(entries.map((entry) => entry.id).toSet(), {
+        'last',
+        'middle',
+        'orphan',
+      });
+      expect(entries, hasLength(3));
+      verify(() => honoo.in_('id', ['middle', 'unavailable'])).called(1);
+    },
+  );
+
+  test('mantiene il segnaposto per un antenato eliminato', () async {
+    final honoo = harness.stubTable('honoo');
+    final hinoo = harness.stubTable('hinoo');
+    honoo.queueResponse([
+      historyRow('last', parent: 'deleted', conversation: 'current'),
+    ]);
+    hinoo.queueResponse([]);
+    honoo.queueResponse([
+      historyRow('deleted', conversation: 'older', deleted: true),
+    ]);
+    hinoo.queueResponse([]);
+    final entries = await ConversationService.fetchConversation('current');
+    expect(entries.map((entry) => entry.id), ['deleted', 'last']);
+    expect(entries.first.kind, ConversationEntryKind.deleted);
+  });
+
   test('ordina honoo e hinoo usando il created_at reale', () async {
     final honoo = harness.stubTable('honoo');
     final hinoo = harness.stubTable('hinoo');

@@ -9,6 +9,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'reliability_policy.dart';
 
 class ConversationService {
+  static const _honooColumns =
+      'id,text,image_url,destination,reply_to,recipient_tag,created_at,updated_at,user_id,conversation_id,is_from_moon_saved,admin_deleted_at';
+  static const _hinooColumns =
+      'id,pages,type,recipient_tag,reply_to,created_at,user_id,conversation_id,is_from_moon_saved,admin_deleted_at';
+
   static SupabaseClient get _client => SupabaseProvider.client;
 
   static Future<List<ConversationEntry>> fetchConversation(
@@ -21,18 +26,14 @@ class ConversationService {
     final rows = await Future.wait<dynamic>([
       _client
           .from('honoo')
-          .select(
-            'id,text,image_url,destination,reply_to,recipient_tag,created_at,updated_at,user_id,conversation_id,is_from_moon_saved,admin_deleted_at',
-          )
+          .select(_honooColumns)
           .or(
             'conversation_id.eq.$conversationId,and(conversation_id.is.null,or(id.eq.$conversationId,reply_to.eq.$conversationId))',
           )
           .order('created_at', ascending: true),
       _client
           .from('hinoo')
-          .select(
-            'id,pages,type,recipient_tag,reply_to,created_at,user_id,conversation_id,is_from_moon_saved,admin_deleted_at',
-          )
+          .select(_hinooColumns)
           .or(
             'conversation_id.eq.$conversationId,and(conversation_id.is.null,or(id.eq.$conversationId,reply_to.eq.$conversationId))',
           )
@@ -43,8 +44,9 @@ class ConversationService {
           .eq('conversation_id', conversationId)
           .order('original_created_at', ascending: true),
     ]);
-    final honooRows = rows[0] as List;
-    final hinooRows = rows[1] as List;
+    final honooRows = List<dynamic>.of(rows[0] as List);
+    final hinooRows = List<dynamic>.of(rows[1] as List);
+    await _completeHistory(conversationId, honooRows, hinooRows);
     final tombstoneRows = rows[2] as List;
 
     final entries = <_Entry>[];
@@ -113,58 +115,6 @@ class ConversationService {
         .map((entry) => entry.id)
         .whereType<String>()
         .toSet();
-    final missingParentIds = entries
-        .map((entry) => entry.honoo?.replyTo ?? entry.hinoo?.replyTo)
-        .whereType<String>()
-        .where((id) => id.isNotEmpty && !existingIds.contains(id))
-        .toSet();
-    if (missingParentIds.isNotEmpty) {
-      final parentRows = await Future.wait<dynamic>([
-        _client
-            .from('honoo')
-            .select(
-              'id,text,image_url,destination,reply_to,recipient_tag,created_at,updated_at,user_id,conversation_id,is_from_moon_saved,admin_deleted_at',
-            )
-            .in_('id', missingParentIds.toList()),
-        _client
-            .from('hinoo')
-            .select(
-              'id,pages,type,recipient_tag,reply_to,created_at,user_id,conversation_id,is_from_moon_saved,admin_deleted_at',
-            )
-            .in_('id', missingParentIds.toList()),
-      ]);
-      final parentHonooRows = parentRows[0] as List;
-      final parentHinooRows = parentRows[1] as List;
-      for (final row in parentHonooRows) {
-        if (row['admin_deleted_at'] != null) continue;
-        entries.add(
-          _Entry.honoo(Honoo.fromMap(Map<String, dynamic>.from(row))),
-        );
-      }
-      for (final row in parentHinooRows) {
-        if (row['admin_deleted_at'] != null || row['pages'] is! List) continue;
-        final pages = (row['pages'] as List)
-            .whereType<Map<String, dynamic>>()
-            .map(HinooSlide.fromJson)
-            .toList();
-        entries.add(
-          _Entry.hinoo(
-            HinooDraft(
-              pages: pages,
-              type: _fromDbType(row['type'] as String?),
-              recipientTag: row['recipient_tag']?.toString(),
-              replyTo: row['reply_to']?.toString(),
-              conversationId: row['conversation_id']?.toString(),
-              isFromMoonSaved: (row['is_from_moon_saved'] as bool?) ?? false,
-            ),
-            createdAt: _parseCreatedAt(row['created_at']),
-            ownerId: row['user_id']?.toString(),
-            id: row['id']?.toString(),
-            isFromMoonSaved: (row['is_from_moon_saved'] as bool?) ?? false,
-          ),
-        );
-      }
-    }
     for (final row in tombstoneRows) {
       final id = row['content_id']?.toString();
       if (id == null || id.isEmpty || !existingIds.add(id)) continue;
@@ -194,6 +144,74 @@ class ConversationService {
           ),
         )
         .toList();
+  }
+
+  /// Reconstruct saved history at read time, including pre-conversation_id
+  /// replies. Follow ancestors across forks, but never load sibling forks.
+  static Future<void> _completeHistory(
+    String conversationId,
+    List<dynamic> honooRows,
+    List<dynamic> hinooRows,
+  ) async {
+    final knownIds = <String>{};
+    final pendingParents = <String>{};
+    final pendingChildren = <String>{};
+    final checkedParents = <String>{};
+    final checkedChildren = <String>{};
+
+    void track(dynamic row, {required bool exploreChildren}) {
+      final id = row['id']?.toString();
+      if (id == null || id.isEmpty || !knownIds.add(id)) return;
+      final parent = row['reply_to']?.toString();
+      if (parent != null && parent.isNotEmpty) pendingParents.add(parent);
+      if (exploreChildren) pendingChildren.add(id);
+    }
+
+    for (final row in [...honooRows, ...hinooRows]) {
+      track(row, exploreChildren: true);
+    }
+
+    while (true) {
+      pendingParents.removeWhere(
+        (id) => knownIds.contains(id) || checkedParents.contains(id),
+      );
+      pendingChildren.removeAll(checkedChildren);
+      final loadingParents = pendingParents.isNotEmpty;
+      final batch = (loadingParents ? pendingParents : pendingChildren)
+          .take(100)
+          .toList();
+      if (batch.isEmpty) break;
+      (loadingParents ? checkedParents : checkedChildren).addAll(batch);
+      final results = await Future.wait<dynamic>([
+        for (final table in ['honoo', 'hinoo'])
+          loadingParents
+              ? _client
+                    .from(table)
+                    .select(table == 'honoo' ? _honooColumns : _hinooColumns)
+                    .in_('id', batch)
+              : _client
+                    .from(table)
+                    .select(table == 'honoo' ? _honooColumns : _hinooColumns)
+                    .in_('reply_to', batch)
+                    .is_('conversation_id', null),
+      ]);
+      for (var tableIndex = 0; tableIndex < results.length; tableIndex++) {
+        for (final row in results[tableIndex] as List) {
+          final id = row['id']?.toString();
+          if (id == null || id.isEmpty || knownIds.contains(id)) continue;
+          (tableIndex == 0 ? honooRows : hinooRows).add(row);
+          // Ancestors from another conversation supply context only. Their
+          // other replies belong to separate dialogs, even when readable.
+          track(
+            row,
+            exploreChildren:
+                !loadingParents ||
+                row['conversation_id'] == null ||
+                row['conversation_id'] == conversationId,
+          );
+        }
+      }
+    }
   }
 
   static DateTime _parseCreatedAt(dynamic value) =>

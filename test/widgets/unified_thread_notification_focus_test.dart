@@ -48,6 +48,46 @@ void main() {
   }
 
   testWidgets(
+    'la cronologia resta scorribile senza notifiche, anche riaprendola',
+    (tester) async {
+      final entries = [
+        moonRoot(),
+        reply(id: 'older', owner: 'other', createdAt: '2026-07-20T11:00:00Z'),
+        reply(id: 'latest', owner: 'me', createdAt: '2026-07-20T12:00:00Z'),
+      ];
+      for (var opening = 0; opening < 2; opening++) {
+        ConversationEntry? selected;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: UnifiedThreadView(
+                conversationId: 'conversation-1',
+                maxWidth: 600,
+                maxHeight: 600,
+                isActive: true,
+                currentUserId: 'me',
+                conversationLoader: (_) async => entries,
+                onSelect: (entry) => selected = entry,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(selected?.id, 'latest');
+        final pager = find.byType(PageView);
+        expect(tester.widget<PageView>(pager).scrollDirection, Axis.vertical);
+        for (final id in ['older', 'moon-root']) {
+          await tester.drag(pager, const Offset(0, -450));
+          await tester.pumpAndSettle();
+          expect(selected?.id, id);
+        }
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      }
+    },
+  );
+
+  testWidgets(
     'dal badge seleziona l’ultima risposta ricevuta, non quella inviata',
     (tester) async {
       final received = reply(
