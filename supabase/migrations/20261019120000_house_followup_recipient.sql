@@ -1,5 +1,6 @@
 -- Keep initial knocks addressed to the house; subsequent outgoing messages
 -- must target its owner so normal reply badges and Realtime filters see them.
+-- Both tables use the same routing for Honoo/Hinoo cross-type continuations.
 create or replace function public.route_house_followup_recipient()
 returns trigger
 language plpgsql

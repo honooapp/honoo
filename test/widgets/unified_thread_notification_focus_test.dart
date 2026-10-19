@@ -54,7 +54,7 @@ void main() {
       final entries = [
         moonRoot(),
         ConversationEntry.hinoo(
-          HinooDraft(
+          const HinooDraft(
             pages: [
               HinooSlide(
                 backgroundImage: null,
