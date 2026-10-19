@@ -116,5 +116,33 @@ try {
   assert.equal(rows[0].hinoo, null);
   await login(visitor);
   await assert.rejects(() => db.query("select public.update_house_guest_access($1,array['all'])", [id]), /not found/);
+  await db.exec('reset role');
+  await db.exec(`
+    alter table public.honoo add column reply_to uuid;
+    alter table public.hinoo add column reply_to uuid;
+    update public.honoo set recipient_tag='${house}', reply_to='${house}';
+    update public.hinoo set user_id='${visitor}', recipient_tag='${house}', reply_to='${house}';
+    insert into public.honoo (id,user_id,recipient_tag,reply_to)
+      values ('00000000-0000-0000-0000-000000000100','${visitor}','${house}','${content}');
+  `);
+  await db.exec(await readFile(new URL('../supabase/migrations/20261019120000_house_followup_recipient.sql', import.meta.url), 'utf8'));
+  assert.equal((await db.query("select recipient_tag from public.honoo where id='00000000-0000-0000-0000-000000000100'")).rows[0].recipient_tag, owner, 'repair existing follow-ups');
+  for (const parentTable of ['honoo', 'hinoo']) {
+    const parentId = crypto.randomUUID();
+    await db.query(`insert into public.${parentTable} (id,user_id,recipient_tag,reply_to) values ($1,$2,$3::text,$3::text::uuid)`, [parentId, visitor, house]);
+    assert.equal((await db.query(`select recipient_tag from public.${parentTable} where id=$1`, [parentId])).rows[0].recipient_tag, house, 'initial request stays on the house badge');
+    for (const replyTable of ['honoo', 'hinoo']) {
+      const replyId = crypto.randomUUID();
+      const sent = (await db.query(`insert into public.${replyTable} (id,user_id,recipient_tag,reply_to) values ($1,$2,$3,$4) returning recipient_tag`, [replyId, visitor, house, parentId])).rows[0];
+      assert.equal(sent.recipient_tag, owner, `${parentTable} → ${replyTable} must match owner reply notification filter`);
+      const received = (await db.query(`insert into public.${parentTable} (id,user_id,recipient_tag,reply_to) values ($1,$2,$3,$4) returning recipient_tag`, [crypto.randomUUID(), owner, visitor, replyId])).rows[0];
+      assert.equal(received.recipient_tag, visitor, 'owner response targets the visitor');
+      const continued = (await db.query(`insert into public.${replyTable} (id,user_id,recipient_tag,reply_to) values ($1,$2,$3,$4) returning recipient_tag`, [crypto.randomUUID(), visitor, house, replyId])).rows[0];
+      assert.equal(continued.recipient_tag, owner, 'stale client continues a normalized outgoing message');
+    }
+  }
+  assert.equal((await db.query('select recipient_tag from public.honoo where id=$1', [content])).rows[0].recipient_tag, house);
+  assert.deepEqual((await db.query('select share_modes from public.house_access where id=$1', [id])).rows[0].share_modes, ['moon'], 'sending messages must not change access permissions');
   console.log('House guests SQL: required content, owner-only updates, revocation and restoration passed.');
+  console.log('House follow-ups SQL: initial requests, backfill, all Honoo/Hinoo combinations and replies passed.');
 } finally { await db.close(); }

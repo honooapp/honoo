@@ -335,6 +335,7 @@ void main() {
       ),
     );
     var entries = [root, reply];
+    Completer<List<ConversationEntry>>? pendingLoad;
     String? selectedId;
 
     Widget app(int refreshToken) => MaterialApp(
@@ -347,7 +348,7 @@ void main() {
           isActive: true,
           currentUserId: 'me',
           refreshToken: refreshToken,
-          conversationLoader: (_) async => entries,
+          conversationLoader: (_) => pendingLoad?.future ?? Future.value(entries),
           onSelect: (entry) => selectedId = entry.id,
         ),
       ),
@@ -358,17 +359,30 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1000));
     expect(selectedId, 'reply-scroll');
 
+    pendingLoad = Completer<List<ConversationEntry>>();
+    await tester.pumpWidget(app(1));
+    await tester.pump();
     await tester.drag(find.byType(PageView), const Offset(0, -650));
     await tester.pumpAndSettle();
     expect(selectedId, 'root-scroll');
 
     entries = [root, reply, newReply];
-    await tester.pumpWidget(app(1));
+    pendingLoad.complete(entries);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(selectedId, 'root-scroll');
     expect(tester.widget<PageView>(find.byType(PageView)).controller!.page, 2);
+    for (final id in ['reply-scroll', 'reply-scroll-new']) {
+      await tester.drag(find.byType(PageView), const Offset(0, 650));
+      await tester.pumpAndSettle();
+      expect(selectedId, id);
+    }
+    for (final id in ['reply-scroll', 'root-scroll']) {
+      await tester.drag(find.byType(PageView), const Offset(0, -650));
+      await tester.pumpAndSettle();
+      expect(selectedId, id);
+    }
   });
 
   testWidgets(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:honoo/Entities/conversation_entry.dart';
+import 'package:honoo/Entities/hinoo.dart';
 import 'package:honoo/Entities/honoo.dart';
 import 'package:honoo/UI/unified_thread_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -52,7 +53,22 @@ void main() {
     (tester) async {
       final entries = [
         moonRoot(),
-        reply(id: 'older', owner: 'other', createdAt: '2026-07-20T11:00:00Z'),
+        ConversationEntry.hinoo(
+          HinooDraft(
+            pages: [
+              HinooSlide(
+                backgroundImage: null,
+                text: 'older',
+                isTextWhite: true,
+              ),
+            ],
+            type: HinooType.answer,
+            conversationId: 'conversation-1',
+          ),
+          id: 'older',
+          ownerId: 'other',
+          createdAt: DateTime.parse('2026-07-20T11:00:00Z'),
+        ),
         reply(id: 'latest', owner: 'me', createdAt: '2026-07-20T12:00:00Z'),
       ];
       for (var opening = 0; opening < 2; opening++) {
@@ -74,10 +90,15 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(selected?.id, 'latest');
-        final pager = find.byType(PageView);
+        final pager = find.byType(PageView).first;
         expect(tester.widget<PageView>(pager).scrollDirection, Axis.vertical);
         for (final id in ['older', 'moon-root']) {
           await tester.drag(pager, const Offset(0, -450));
+          await tester.pumpAndSettle();
+          expect(selected?.id, id);
+        }
+        for (final id in ['older', 'latest']) {
+          await tester.drag(pager, const Offset(0, 450));
           await tester.pumpAndSettle();
           expect(selected?.id, id);
         }

@@ -239,11 +239,6 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
     if (!mounted) return;
     final generation = ++_loadGeneration;
     final conversationId = widget.conversationId;
-    final pageBeforeLoad = _currentPageIndex;
-    final selectedEntryBeforeLoad =
-        pageBeforeLoad > 0 && pageBeforeLoad < _entries.length
-        ? _entries.reversed.elementAt(pageBeforeLoad)
-        : null;
     if (_entries.isEmpty) {
       setState(() => _loading = true);
     }
@@ -258,6 +253,13 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
           conversationId != widget.conversationId) {
         return;
       }
+      // The reader can scroll while the request is in flight. Preserve the
+      // position at completion, rather than restoring the page at request time.
+      final pageBeforeLoad = _currentPageIndex;
+      final selectedEntryBeforeLoad =
+          pageBeforeLoad > 0 && pageBeforeLoad < _entries.length
+          ? _entries.reversed.elementAt(pageBeforeLoad)
+          : null;
       final wasEmpty = _entries.isEmpty;
       setState(() {
         _entries = entries;
