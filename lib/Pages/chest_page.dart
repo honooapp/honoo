@@ -726,7 +726,9 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
 
   Future<void> _deleteHonoo(Honoo honoo) async {
     if (!_isAdmin &&
-        (_selectedConvEntry != null ||
+        (honoo.userId != SupabaseProvider.client.auth.currentUser?.id ||
+            honoo.isFromMoonSaved == true ||
+            _selectedConvEntry != null ||
             honoo.type == HonooType.answer ||
             _conversationIdForDeletion(
                   ChestItem.honoo(honoo, DateTime(1970)),
@@ -849,7 +851,9 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
 
   Future<void> _deleteHinoo(ChestHinooItem current) async {
     if (!_isAdmin &&
-        (_selectedConvEntry != null ||
+        (current.ownerId != SupabaseProvider.client.auth.currentUser?.id ||
+            current.isFromMoonSaved ||
+            _selectedConvEntry != null ||
             current.draft.type == HinooType.answer ||
             _conversationIdForDeletion(ChestItem.hinoo(current)) != null)) {
       return;

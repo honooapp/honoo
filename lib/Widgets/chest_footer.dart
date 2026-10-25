@@ -101,8 +101,7 @@ class ChestFooter extends StatelessWidget {
       desiredGap: gap,
       minGap: 16,
       height: iconSize,
-      // Reserve each action's position while the selected thread is loading.
-      // Hidden slots have no button, tooltip or accessibility action.
+      // Keep unavailable actions visible in their usual positions.
       actions: [
         if (onOpenHouse != null)
           actions.firstWhere((a) => a.tooltip == 'Apri la casa'),
@@ -114,11 +113,18 @@ class ChestFooter extends StatelessWidget {
           'Rispondi',
         ])
           actions.where((action) => action.tooltip == tooltip).firstOrNull ??
-              ResponsiveFooterAction(
-                asset: '',
-                size: iconSize,
+              _action(
+                asset: switch (tooltip) {
+                  'Home' => 'assets/icons/home.svg',
+                  'Info' => 'assets/icons/info.svg',
+                  'Spedisci sulla Luna' => 'assets/icons/moon.svg',
+                  'Cancella' => 'assets/Cestino.svg',
+                  _ => 'assets/icons/reply.svg',
+                },
+                label: tooltip,
                 tooltip: tooltip,
-                visible: false,
+                onPressed: null,
+                color: foregroundColor.withValues(alpha: 0.3),
               ),
       ],
     );
@@ -140,11 +146,14 @@ class ChestFooter extends StatelessWidget {
     }
 
     if (isAdmin ||
-        !(isConversation ||
-            selectedConversationEntry != null ||
-            honoo.conversationId?.isNotEmpty == true ||
-            honoo.hasReplies ||
-            honoo.type == HonooType.answer)) {
+        (isMine &&
+            !isFromMoonSaved &&
+            !(isConversation ||
+                selectedConversationEntry != null ||
+                honoo.conversationId?.isNotEmpty == true ||
+                honoo.hasReplies ||
+                honoo.type == HonooType.answer ||
+                honoo.replyTo?.isNotEmpty == true))) {
       actions.add(_deleteAction(() => onDeleteHonoo(honoo)));
     }
 
@@ -218,11 +227,14 @@ class ChestFooter extends StatelessWidget {
       actions.add(_replyAction(() => onReplyToHinoo(hinoo)));
     }
     if (isAdmin ||
-        !(isConversation ||
-            selectedConversationEntry != null ||
-            hinoo.conversationId?.isNotEmpty == true ||
-            hinoo.draft.conversationId?.isNotEmpty == true ||
-            hinoo.draft.type == HinooType.answer)) {
+        (_isMine(hinoo.ownerId) &&
+            !isFromMoonSaved &&
+            !(isConversation ||
+                selectedConversationEntry != null ||
+                hinoo.conversationId?.isNotEmpty == true ||
+                hinoo.draft.conversationId?.isNotEmpty == true ||
+                hinoo.draft.type == HinooType.answer ||
+                hinoo.draft.replyTo?.isNotEmpty == true))) {
       actions.add(_deleteAction(() => onDeleteHinoo(hinoo)));
     }
 
@@ -285,7 +297,7 @@ class ChestFooter extends StatelessWidget {
     required String asset,
     required String label,
     required String tooltip,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     bool applyColorFilter = true,
     Color? color,
   }) => ResponsiveFooterAction(

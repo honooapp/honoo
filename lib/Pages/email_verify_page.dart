@@ -184,14 +184,34 @@ class _EmailVerifyPageState extends State<EmailVerifyPage> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Controlla la posta in arrivo all’indirizzo ${widget.email} '
-                'Inserisci qui il codice a sei cifre per completare l’accesso',
+                'Controlla la posta in arrivo all’indirizzo',
                 style: GoogleFonts.arvo(
                   color: HonooColor.onBackground.withValues(alpha: 0.8),
                   fontSize: 16,
                   fontWeight: FontWeight.w400,
                 ),
                 textAlign: TextAlign.center,
+              ),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  widget.email,
+                  maxLines: 1,
+                  style: GoogleFonts.arvo(
+                    color: HonooColor.onBackground.withValues(alpha: 0.8),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
+              Text(
+                'Inserisci qui il codice a sei cifre\nper completare l’accesso',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.arvo(
+                  color: HonooColor.onBackground.withValues(alpha: 0.8),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w400,
+                ),
               ),
               const SizedBox(height: 32),
               TextField(

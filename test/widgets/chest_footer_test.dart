@@ -8,6 +8,28 @@ import 'package:honoo/Entities/honoo.dart';
 import 'package:honoo/Utility/honoo_colors.dart';
 import 'package:honoo/Widgets/chest_footer.dart';
 
+void expectDisabled(WidgetTester tester, String tooltip) {
+  final button = tester.widget<IconButton>(
+    find.byWidgetPredicate(
+      (widget) => widget is IconButton && widget.tooltip == tooltip,
+    ),
+  );
+  expect(button.onPressed, isNull);
+  final icon = tester.widget<SvgPicture>(
+    find.descendant(
+      of: find.byTooltip(tooltip),
+      matching: find.byType(SvgPicture),
+    ),
+  );
+  expect(
+    icon.colorFilter,
+    ColorFilter.mode(
+      HonooColor.onBackground.withValues(alpha: 0.3),
+      BlendMode.srcIn,
+    ),
+  );
+}
+
 void main() {
   ChestItem honooItem(
     HonooType type, {
@@ -165,7 +187,7 @@ void main() {
       await pumpFooter(tester, item: item);
       final home = tester.getCenter(find.byTooltip('Home'));
       final info = tester.getCenter(find.byTooltip('Info'));
-      expect(find.byTooltip('Cancella'), findsNothing);
+      expectDisabled(tester, 'Cancella');
       final reply = Honoo(
         0,
         'reply',
@@ -183,11 +205,11 @@ void main() {
       expect(find.byTooltip('Rispondi'), findsOneWidget);
       expect(tester.getCenter(find.byTooltip('Home')), home);
       expect(tester.getCenter(find.byTooltip('Info')), info);
-      expect(find.byTooltip('Cancella'), findsNothing);
+      expectDisabled(tester, 'Cancella');
       await pumpFooter(tester, item: null);
       expect(tester.getCenter(find.byTooltip('Home')), home);
       expect(tester.getCenter(find.byTooltip('Info')), info);
-      expect(find.byTooltip('Rispondi'), findsNothing);
+      expectDisabled(tester, 'Rispondi');
     },
   );
 
@@ -200,7 +222,7 @@ void main() {
       hinooItem(conversationId: 'thread'),
     ]) {
       await pumpFooter(tester, item: item);
-      expect(find.byTooltip('Cancella'), findsNothing);
+      expectDisabled(tester, 'Cancella');
       var deleted = false;
       await pumpFooter(
         tester,
@@ -219,7 +241,7 @@ void main() {
 
     expect(find.byTooltip('Home'), findsOneWidget);
     expect(find.byTooltip('Info'), findsOneWidget);
-    expect(find.byType(IconButton), findsNWidgets(2));
+    expect(find.byType(IconButton), findsNWidgets(5));
     final icons = tester
         .widgetList<SvgPicture>(find.byType(SvgPicture))
         .toList();
@@ -235,7 +257,7 @@ void main() {
     final icons = tester
         .widgetList<SvgPicture>(find.byType(SvgPicture))
         .toList();
-    expect(icons, hasLength(4));
+    expect(icons, hasLength(5));
     expect(icons[0].colorFilter, isNotNull); // Home
     expect(icons[1].colorFilter, isNotNull); // Info
     expect(
@@ -261,9 +283,9 @@ void main() {
     );
 
     expect(find.byTooltip('Vedi risposte'), findsNothing);
-    expect(find.byTooltip('Rispondi'), findsNothing);
+    expectDisabled(tester, 'Rispondi');
     expect(find.byTooltip('Spedisci sulla Luna'), findsOneWidget);
-    expect(find.byType(IconButton), findsNWidgets(3));
+    expect(find.byType(IconButton), findsNWidgets(5));
   });
 
   testWidgets('Honoo personale mostra Luna e Cancella e inoltra le azioni', (
@@ -278,7 +300,7 @@ void main() {
       onDeleteHonoo: (_) => deleted = true,
     );
 
-    expect(find.byType(IconButton), findsNWidgets(4));
+    expect(find.byType(IconButton), findsNWidgets(5));
     expect(find.byTooltip('Spedisci sulla Luna'), findsOneWidget);
     expect(find.byTooltip('Cancella'), findsOneWidget);
     await tester.tap(find.byTooltip('Spedisci sulla Luna'));
@@ -299,7 +321,7 @@ void main() {
       onDeleteHinoo: (_) => deleted = true,
     );
 
-    expect(find.byType(IconButton), findsNWidgets(4));
+    expect(find.byType(IconButton), findsNWidgets(5));
     await tester.tap(find.byTooltip('Spedisci sulla Luna'));
     await tester.tap(find.byTooltip('Cancella'));
     expect(sent, isTrue);
@@ -318,7 +340,7 @@ void main() {
     expect(find.byTooltip('Cancella'), findsOneWidget);
   });
 
-  testWidgets('Honoo salvato dalla Luna non mostra l’azione Luna', (
+  testWidgets('Honoo salvato dalla Luna mantiene Luna disattivata', (
     tester,
   ) async {
     await pumpFooter(
@@ -326,11 +348,11 @@ void main() {
       item: honooItem(HonooType.personal, isFromMoonSaved: true),
     );
 
-    expect(find.byTooltip('Spedisci sulla Luna'), findsNothing);
+    expectDisabled(tester, 'Spedisci sulla Luna');
     expect(find.byTooltip('Rispondi'), findsOneWidget);
   });
 
-  testWidgets('Honoo personale di un altro utente non mostra Luna', (
+  testWidgets('Honoo personale di un altro utente mantiene Luna disattivata', (
     tester,
   ) async {
     await pumpFooter(
@@ -338,7 +360,8 @@ void main() {
       item: honooItem(HonooType.personal, ownerId: 'another-user'),
     );
 
-    expect(find.byTooltip('Spedisci sulla Luna'), findsNothing);
+    expectDisabled(tester, 'Spedisci sulla Luna');
+    expectDisabled(tester, 'Cancella');
   });
 
   testWidgets(
@@ -477,7 +500,7 @@ void main() {
   );
 
   testWidgets(
-    'la selezione di un contenuto salvato dalla Luna non mostra Luna',
+    'la selezione di un contenuto salvato dalla Luna mantiene Luna disattivata',
     (tester) async {
       final item = honooItem(
         HonooType.personal,
@@ -493,7 +516,7 @@ void main() {
         selectedConversationEntry: selectedEntry,
       );
 
-      expect(find.byTooltip('Spedisci sulla Luna'), findsNothing);
+      expectDisabled(tester, 'Spedisci sulla Luna');
       expect(find.byTooltip('Rispondi'), findsOneWidget);
     },
   );
@@ -559,7 +582,7 @@ void main() {
       iconSize: 60,
     );
 
-    expect(find.byType(IconButton), findsNWidgets(4));
+    expect(find.byType(IconButton), findsNWidgets(5));
     expect(tester.takeException(), isNull);
   });
 
@@ -572,21 +595,22 @@ void main() {
     expect(find.byTooltip('Cancella'), findsOneWidget);
   });
 
-  testWidgets('Hinoo salvato dalla Luna non mostra l’azione Luna', (
+  testWidgets('Hinoo salvato dalla Luna mantiene Luna disattivata', (
     tester,
   ) async {
     await pumpFooter(tester, item: hinooItem(isFromMoonSaved: true));
 
-    expect(find.byTooltip('Spedisci sulla Luna'), findsNothing);
+    expectDisabled(tester, 'Spedisci sulla Luna');
     expect(find.byTooltip('Rispondi'), findsOneWidget);
   });
 
-  testWidgets('Hinoo personale di un altro utente non mostra Luna', (
+  testWidgets('Hinoo personale di un altro utente mantiene Luna disattivata', (
     tester,
   ) async {
     await pumpFooter(tester, item: hinooItem(ownerId: 'another-user'));
 
-    expect(find.byTooltip('Spedisci sulla Luna'), findsNothing);
+    expectDisabled(tester, 'Spedisci sulla Luna');
+    expectDisabled(tester, 'Cancella');
   });
 
   testWidgets('contenuto ricevuto non permette la cancellazione agli utenti', (
@@ -594,11 +618,11 @@ void main() {
   ) async {
     await pumpFooter(tester, item: honooItem(HonooType.answer));
 
-    expect(find.byType(IconButton), findsNWidgets(2));
+    expect(find.byType(IconButton), findsNWidgets(5));
     expect(find.byTooltip('Home'), findsOneWidget);
     expect(find.byTooltip('Info'), findsOneWidget);
-    expect(find.byTooltip('Cancella'), findsNothing);
-    expect(find.byTooltip('Spedisci sulla Luna'), findsNothing);
-    expect(find.byTooltip('Rispondi'), findsNothing);
+    expectDisabled(tester, 'Cancella');
+    expectDisabled(tester, 'Spedisci sulla Luna');
+    expectDisabled(tester, 'Rispondi');
   });
 }
