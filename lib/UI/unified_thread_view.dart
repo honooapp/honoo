@@ -78,9 +78,20 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
   String? _loadInProgressFor;
   bool _loadRequested = false;
   bool _selectionScheduled = false;
+  bool _routeIsCurrent = false;
   final PageController _pageController = PageController();
   late AnimationController _controller;
   late Animation<double> _liftAnimation;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Subscribe to route visibility, including dialogs covering this page.
+    // A reply loaded behind a dialog must be marked when it becomes visible.
+    final isCurrent = ModalRoute.isCurrentOf(context) ?? true;
+    if (isCurrent && !_routeIsCurrent) _scheduleSelection();
+    _routeIsCurrent = isCurrent;
+  }
 
   @override
   void initState() {
@@ -390,7 +401,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
       if (userId == null ||
           entry.ownerId == null ||
           entry.ownerId == userId ||
-          ModalRoute.of(context)?.isCurrent == false ||
+          !_routeIsCurrent ||
           !_isReceivedReply(entry)) {
         return;
       }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:honoo/Entities/conversation_entry.dart';
@@ -95,6 +97,52 @@ void main() {
           ),
           isTrue,
         );
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+
+    testWidgets(
+      '$kind: registra la lettura quando si chiude il popup sopra la conversazione',
+      (tester) async {
+        final loaded = Completer<List<ConversationEntry>>();
+        final navigatorKey = GlobalKey<NavigatorState>();
+        await tester.pumpWidget(
+          MaterialApp(
+            navigatorKey: navigatorKey,
+            home: Scaffold(
+              body: UnifiedThreadView(
+                conversationId: 'conversation',
+                maxWidth: 800,
+                maxHeight: 600,
+                isActive: true,
+                conversationLoader: (_) => loaded.future,
+              ),
+            ),
+          ),
+        );
+        unawaited(
+          showDialog<void>(
+            context: navigatorKey.currentContext!,
+            builder: (_) => const AlertDialog(content: Text('Notifica')),
+          ),
+        );
+        await tester.pump();
+        loaded.complete([
+          entry('older', 'other', 10),
+          entry('received', 'other', 11),
+        ]);
+        await tester.pumpAndSettle();
+        expect(
+          (await RepliesSeenTracker.load(userId: 'test_user')).replyIds,
+          isEmpty,
+        );
+
+        navigatorKey.currentState!.pop();
+        await tester.pumpAndSettle();
+        final state = await RepliesSeenTracker.load(userId: 'test_user');
+        expect(state.replyIds, contains('received'));
+        expect(state.replyIds, isNot(contains('older')));
+        // No scrolling or periodic reload is needed to record the read.
         await tester.pumpWidget(const SizedBox());
       },
     );
