@@ -40,10 +40,12 @@ void main() {
     await tester.pump();
 
     expect(
-      find.text(
-        'Controlla la posta in arrivo all’indirizzo utente@example.com '
-        'Inserisci qui il codice a sei cifre per completare l’accesso',
-      ),
+      find.text('Controlla la posta in arrivo all’indirizzo'),
+      findsOneWidget,
+    );
+    expect(find.text('utente@example.com'), findsOneWidget);
+    expect(
+      find.text('Inserisci qui il codice a sei cifre\nper completare l’accesso'),
       findsOneWidget,
     );
   });
