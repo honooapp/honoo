@@ -178,8 +178,11 @@ class _HinooViewerState extends State<HinooViewer> {
                                   position.maxScrollExtent,
                                 );
                             if ((target - position.pixels).abs() > 0.5) {
-                              _vController.jumpTo(target);
-                              _scheduleSnap();
+                              GestureBinding.instance.pointerSignalResolver
+                                  .register(event, (_) {
+                                    _vController.jumpTo(target);
+                                    _scheduleSnap();
+                                  });
                             }
                           }
                         },

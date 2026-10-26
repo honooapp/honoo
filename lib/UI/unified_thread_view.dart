@@ -75,6 +75,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
   String? _appliedFocusKey;
   int _currentPageIndex = 0;
   int _loadGeneration = 0;
+  bool _wheelInProgress = false;
   String? _loadInProgressFor;
   bool _loadRequested = false;
   bool _selectionScheduled = false;
@@ -258,6 +259,13 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
       final loader =
           widget.conversationLoader ?? ConversationService.fetchConversation;
       final entries = await loader(conversationId);
+      // Never replace the timeline underneath a drag or a settling page.
+      while (mounted &&
+          conversationId == widget.conversationId &&
+          _pageController.hasClients &&
+          _pageController.position.isScrollingNotifier.value) {
+        await Future<void>.delayed(const Duration(milliseconds: 16));
+      }
 
       if (!mounted ||
           generation != _loadGeneration ||
@@ -268,7 +276,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
       // position at completion, rather than restoring the page at request time.
       final pageBeforeLoad = _currentPageIndex;
       final selectedEntryBeforeLoad =
-          pageBeforeLoad > 0 && pageBeforeLoad < _entries.length
+          pageBeforeLoad >= 0 && pageBeforeLoad < _entries.length
           ? _entries.reversed.elementAt(pageBeforeLoad)
           : null;
       final wasEmpty = _entries.isEmpty;
@@ -279,7 +287,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
       });
       final focusWasApplied = _appliedFocusKey;
       _prefetchEntriesFrom(_pageToShowFirst);
-      _showLatestReceivedAndReveal(forceFocus: wasEmpty);
+      if (wasEmpty) _showLatestReceivedAndReveal(forceFocus: true);
       if (widget.isActive && _entries.isNotEmpty) {
         final hasExplicitReveal =
             (widget.revealEntryId ?? '').isNotEmpty &&
@@ -288,8 +296,13 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
         var selectedPage = (wasEmpty || hasExplicitReveal)
             ? _pageToShowFirst
             : pageBeforeLoad.clamp(0, _entries.length - 1);
+        final newestIsOwn =
+            reversed.first.ownerId ==
+            (widget.currentUserId ??
+                SupabaseProvider.client.auth.currentUser?.id);
         if (!wasEmpty &&
             !hasExplicitReveal &&
+            !(pageBeforeLoad == 0 && newestIsOwn) &&
             selectedEntryBeforeLoad != null) {
           final preservedPage = reversed.indexWhere(
             (entry) =>
@@ -300,7 +313,12 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
         }
         if (selectedPage != pageBeforeLoad) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted || !_pageController.hasClients) return;
+            if (!mounted ||
+                generation != _loadGeneration ||
+                conversationId != widget.conversationId ||
+                !_pageController.hasClients) {
+              return;
+            }
             _pageController.jumpToPage(selectedPage);
             _currentPageIndex = selectedPage;
           });
@@ -475,8 +493,11 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
       return;
     }
     _appliedFocusKey = focusKey;
+    final conversationId = widget.conversationId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted ||
+          conversationId != widget.conversationId ||
+          _appliedFocusKey != focusKey ||
           !widget.isActive ||
           _entries.isEmpty ||
           _missingNotificationTarget) {
@@ -698,50 +719,81 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
             }
           },
           itemCount: _entries.length,
-          itemBuilder: (context, index) {
-            // Ordine inverso: ultimo (più recente) in cima
-            final revIndex = _entries.length - 1 - index;
-            final e = _entries[revIndex];
-            final Widget page = _entryCard(e);
-            if (index == _pageToShowFirst && _shouldReveal(e)) {
-              final answeredEntry = _answeredEntryFor(e);
-              if (answeredEntry == null) return page;
-              final answeredPage = Transform.translate(
-                offset: Offset(0, widget.maxHeight * 0.52),
-                child: _entryCard(
-                  answeredEntry,
-                  keyName: 'reply_reveal_parent',
-                  showAsOwnedContent: _isOwnedByCurrentUser(answeredEntry),
-                ),
-              );
-              return AnimatedBuilder(
-                animation: _liftAnimation,
-                builder: (context, childWidget) {
-                  final double revealHeight = widget.maxHeight * 0.48;
-                  return ClipRect(
-                    child: Stack(
-                      children: [
-                        answeredPage,
-                        Transform.translate(
-                          key: const Key('reply_reveal_foreground'),
-                          offset: Offset(
-                            0,
-                            _liftAnimation.value * revealHeight,
-                          ),
-                          child: childWidget,
-                        ),
-                      ],
+          itemBuilder: (context, index) => Listener(
+            onPointerSignal: _onPointerSignal,
+            child: Builder(
+              builder: (context) {
+                // Ordine inverso: ultimo (più recente) in cima
+                final revIndex = _entries.length - 1 - index;
+                final e = _entries[revIndex];
+                final Widget page = _entryCard(e);
+                if (index == _pageToShowFirst && _shouldReveal(e)) {
+                  final answeredEntry = _answeredEntryFor(e);
+                  if (answeredEntry == null) return page;
+                  final answeredPage = Transform.translate(
+                    offset: Offset(0, widget.maxHeight * 0.52),
+                    child: _entryCard(
+                      answeredEntry,
+                      keyName: 'reply_reveal_parent',
+                      showAsOwnedContent: _isOwnedByCurrentUser(answeredEntry),
                     ),
                   );
-                },
-                child: page,
-              );
-            }
-            return page;
-          },
+                  return AnimatedBuilder(
+                    animation: _liftAnimation,
+                    builder: (context, childWidget) {
+                      final double revealHeight = widget.maxHeight * 0.48;
+                      return ClipRect(
+                        child: Stack(
+                          children: [
+                            answeredPage,
+                            Transform.translate(
+                              key: const Key('reply_reveal_foreground'),
+                              offset: Offset(
+                                0,
+                                _liftAnimation.value * revealHeight,
+                              ),
+                              child: childWidget,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: page,
+                  );
+                }
+                return page;
+              },
+            ),
+          ),
         ),
       ),
     );
+  }
+
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent ||
+        event.scrollDelta.dy == 0 ||
+        event.scrollDelta.dy.abs() < event.scrollDelta.dx.abs() ||
+        !widget.isActive ||
+        !_pageController.hasClients) {
+      return;
+    }
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+      if (_wheelInProgress || !_pageController.hasClients) return;
+      final target = (_currentPageIndex + (event.scrollDelta.dy > 0 ? 1 : -1))
+          .clamp(0, _entries.length - 1);
+      if (target == _currentPageIndex) return;
+      _wheelInProgress = true;
+      unawaited(
+        _pageController
+            .animateToPage(
+              target,
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
+            )
+            .whenComplete(() => _wheelInProgress = false),
+      );
+    });
   }
 
   // Tile helpers non più utilizzati con il rendering a lista separata

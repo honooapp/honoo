@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:honoo/Entities/conversation_entry.dart';
 import 'package:honoo/Entities/hinoo.dart';
@@ -47,6 +48,130 @@ void main() {
           ..isFromMoonSaved = true;
     return ConversationEntry.honoo(honoo);
   }
+
+  testWidgets('la rotella completa una pagina anche con delta piccolo', (
+    tester,
+  ) async {
+    final entries = [
+      reply(id: 'older', owner: 'me', createdAt: '2026-07-20T10:00:00Z'),
+      reply(id: 'latest', owner: 'me', createdAt: '2026-07-20T11:00:00Z'),
+    ];
+    ConversationEntry? selected;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: UnifiedThreadView(
+            conversationId: 'conversation-1',
+            maxWidth: 600,
+            maxHeight: 600,
+            isActive: true,
+            currentUserId: 'me',
+            conversationLoader: (_) async => entries,
+            onSelect: (entry) => selected = entry,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final pager = tester.widget<PageView>(find.byType(PageView).first);
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: tester.getCenter(find.byType(PageView).first),
+        scrollDelta: const Offset(0, 20),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(selected?.id, 'older');
+    expect(pager.controller!.page, 1);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('la rotella interna di Hinoo non cambia conversazione', (
+    tester,
+  ) async {
+    final entries = [
+      reply(id: 'older', owner: 'me', createdAt: '2026-07-20T10:00:00Z'),
+      ConversationEntry.hinoo(
+        const HinooDraft(
+          pages: [
+            HinooSlide(backgroundImage: null, text: 'prima', isTextWhite: true),
+            HinooSlide(
+              backgroundImage: null,
+              text: 'seconda',
+              isTextWhite: true,
+            ),
+          ],
+          type: HinooType.answer,
+          conversationId: 'conversation-1',
+        ),
+        id: 'latest',
+        ownerId: 'me',
+        createdAt: DateTime.parse('2026-07-20T11:00:00Z'),
+      ),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: UnifiedThreadView(
+            conversationId: 'conversation-1',
+            maxWidth: 600,
+            maxHeight: 600,
+            isActive: true,
+            currentUserId: 'me',
+            conversationLoader: (_) async => entries,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final outer = tester.widget<PageView>(find.byType(PageView).first);
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: tester.getCenter(find.text('prima')),
+        scrollDelta: const Offset(0, 500),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(outer.controller!.page, 0);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('un arrivo retroattivo mantiene la prima risposta in lettura', (
+    tester,
+  ) async {
+    var entries = [
+      reply(id: 'old', owner: 'other', createdAt: '2026-07-20T10:00:00Z'),
+    ];
+    ConversationEntry? selected;
+    Widget app(int token) => MaterialApp(
+      home: Scaffold(
+        body: UnifiedThreadView(
+          conversationId: 'conversation-1',
+          maxWidth: 600,
+          maxHeight: 600,
+          isActive: true,
+          currentUserId: 'me',
+          refreshToken: token,
+          conversationLoader: (_) async => entries,
+          onSelect: (entry) => selected = entry,
+        ),
+      ),
+    );
+    await tester.pumpWidget(app(0));
+    await tester.pumpAndSettle();
+    entries = [
+      ...entries,
+      reply(id: 'new', owner: 'other', createdAt: '2026-07-20T11:00:00Z'),
+    ];
+    await tester.pumpWidget(app(1));
+    await tester.pumpAndSettle();
+    expect(selected?.id, 'old');
+    await tester.drag(find.byType(PageView).first, const Offset(0, 450));
+    await tester.pumpAndSettle();
+    expect(selected?.id, 'new');
+    await tester.pumpWidget(const SizedBox());
+  });
 
   testWidgets(
     'la cronologia resta scorribile senza notifiche, anche riaprendola',

@@ -2,6 +2,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:honoo/Entities/reply_notification_event.dart';
 
 void main() {
+  test('non notifica risposte già cancellate senza modificare i record', () {
+    final row = {
+      'id': 'old',
+      'destination': 'reply',
+      'reply_to': 'root',
+      'conversation_id': 'conversation',
+      'recipient_tag': 'me',
+      'user_id': 'other',
+      'admin_deleted_at': '2026-01-01T00:00:00Z',
+    };
+    expect(
+      ReplyNotificationEvent.fromRealtimePayload(
+        {'eventType': 'INSERT', 'new': row},
+        kind: ReplyNotificationKind.honoo,
+        currentUserId: 'me',
+      ),
+      isNull,
+    );
+    expect(row['id'], 'old');
+  });
+
   test('riconosce una nuova risposta Honoo destinata all’utente', () {
     final event = ReplyNotificationEvent.fromRealtimePayload(
       {

@@ -16,10 +16,11 @@ class ReplyCatchUpService {
       dynamic query = SupabaseProvider.client
           .from(isHonoo ? 'honoo' : 'hinoo')
           .select(
-            'id,${isHonoo ? 'destination' : 'type'},reply_to,recipient_tag,created_at,user_id,conversation_id',
+            'id,${isHonoo ? 'destination' : 'type'},reply_to,recipient_tag,created_at,user_id,conversation_id,admin_deleted_at',
           )
           .eq(isHonoo ? 'destination' : 'type', isHonoo ? 'reply' : 'answer')
           .eq('recipient_tag', userId)
+          .is_('admin_deleted_at', null)
           .lte('created_at', until.toUtc().toIso8601String());
       if (since != null) query = query.gt('created_at', since);
       if (cursor != null) {

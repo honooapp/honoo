@@ -8,6 +8,7 @@ import '../Entities/reply_notification_event.dart';
 import '../Pages/chest_page.dart';
 import '../Services/reply_system_notification.dart';
 import '../Services/reply_catch_up_service.dart';
+import '../Services/chest_repository.dart';
 import '../Services/supabase_provider.dart';
 import '../Utility/reply_notification_signal.dart';
 import '../Utility/replies_seen_tracker.dart';
@@ -76,11 +77,9 @@ class _GlobalReplyNotificationListenerState
       _homeReplayPending = true;
       return;
     }
-    _deliveredEventKeys.clear();
-    _lastCatchUpAt = null;
-    for (final event in _shownEvents.values.toList()) {
-      _handleEvent(event);
-    }
+    // Keep delivery deduplication across navigation. Unread replies remain
+    // available in the chest without interrupting every return to Home.
+    _reconcileSeenNotifications();
     final userId = _activeUserId;
     if (userId != null && widget.replyEventStream == null) {
       unawaited(_catchUpMissedReplies(userId, _channelGeneration));
@@ -274,7 +273,20 @@ class _GlobalReplyNotificationListenerState
     final generation = _notificationGeneration;
     final queuedEvents = _pendingEvents.values.toList(growable: false);
     _pendingEvents.clear();
-    final events = await _onlyUnseenEvents(queuedEvents);
+    final List<ReplyNotificationEvent> events;
+    try {
+      events = await _onlyUnseenEvents(queuedEvents);
+    } catch (_) {
+      if (generation == _notificationGeneration) {
+        for (final event in queuedEvents) {
+          _deliveredEventKeys.remove(
+            '${event.recipientId}:${event.kind.name}:${event.replyId ?? event.conversationId}',
+          );
+        }
+        _lastCatchUpAt = null;
+      }
+      return;
+    }
     if (!mounted || generation != _notificationGeneration || events.isEmpty) {
       return;
     }
@@ -328,7 +340,14 @@ class _GlobalReplyNotificationListenerState
     if (events.isEmpty) return const [];
     final result = <ReplyNotificationEvent>[];
     final states = <String, ReplySeenState>{};
+    final hiddenByUser = <String, Set<String>>{};
     for (final event in events) {
+      final hidden = hiddenByUser[event.recipientId] ??= await ChestRepository()
+          .fetchHiddenConversationIds(event.recipientId);
+      if (hidden.contains(event.conversationId) ||
+          hidden.contains(event.replyId)) {
+        continue;
+      }
       final createdAt = event.createdAt;
       final state = states[event.recipientId] ??= await RepliesSeenTracker.load(
         userId: event.recipientId,
@@ -345,7 +364,11 @@ class _GlobalReplyNotificationListenerState
   }
 
   void _reconcileSeenNotifications() {
-    unawaited(_closeNotificationsAlreadySeen());
+    unawaited(
+      _closeNotificationsAlreadySeen().catchError((Object _) {
+        // Retry reconciliation on the next signal or Home entry.
+      }),
+    );
   }
 
   Future<void> _closeNotificationsAlreadySeen() async {
@@ -522,6 +545,14 @@ class _GlobalReplyNotificationListenerState
               focusReplyId: event.replyId,
               highlightLatest: true,
             ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text('Impossibile aprire le risposte. Riprova.'),
           ),
         );
       }

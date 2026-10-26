@@ -60,6 +60,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     harness = SupabaseTestHarness(withAuthenticatedUser: true)
       ..enableOverrides();
+    harness.stubTable('chest_hidden_conversations');
     harness.stubTable('honoo');
     harness.stubTable('hinoo');
     harness.stubTable('conversation_tombstones');
@@ -69,6 +70,40 @@ void main() {
   tearDown(() async {
     await events.close();
     harness.disableOverrides();
+  });
+
+  testWidgets('le conversazioni già nascoste non notificano al recupero', (
+    tester,
+  ) async {
+    final hidden = harness.stubTable('chest_hidden_conversations');
+    hidden.queueResponse([
+      {'conversation_id': 'hidden-conversation'},
+    ]);
+    final navigatorKey = GlobalKey<NavigatorState>();
+    final notification = _FakeReplySystemNotification();
+    await tester.pumpWidget(
+      GlobalReplyNotificationListener(
+        navigatorKey: navigatorKey,
+        systemNotification: notification,
+        replyEventStream: events.stream,
+        child: MaterialApp(navigatorKey: navigatorKey, home: const Scaffold()),
+      ),
+    );
+    events.add(
+      ReplyNotificationEvent(
+        kind: ReplyNotificationKind.honoo,
+        conversationId: 'hidden-conversation',
+        senderId: 'other',
+        recipientId: 'test_user',
+        replyId: 'old-reply',
+        createdAt: DateTime.utc(2025),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(notification.showCount, 0);
+    expect(find.text('Hai ricevuto una nuova risposta'), findsNothing);
+    verifyNever(() => hidden.delete());
   });
 
   for (final queued in [true, false]) {
@@ -230,9 +265,8 @@ void main() {
     homeEntryRevision.value++;
     await tester.pump(const Duration(milliseconds: 200));
     await tester.pumpAndSettle();
-    expect(find.text('Ignora'), findsOneWidget);
-    await tester.tap(find.text('Ignora'));
-    await tester.pumpAndSettle();
+    expect(find.text('Ignora'), findsNothing);
+    expect(notification.showCount, 1);
     await RepliesSeenTracker.markReply(
       userId: 'test_user',
       replyId: 'reply-pending',

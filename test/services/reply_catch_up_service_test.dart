@@ -25,6 +25,7 @@ void main() {
         since: '2026-09-08T00:00:00Z',
         until: DateTime.utc(2026, 9, 9, 11),
       );
+      verify(() => chain.is_('admin_deleted_at', null)).called(2);
       expect(rows.length, 101);
       expect(rows.last['id'], 'reply-next');
       verify(

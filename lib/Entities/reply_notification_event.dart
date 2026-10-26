@@ -33,6 +33,7 @@ class ReplyNotificationEvent {
     final dynamic rawRecord = payload['new'] ?? payload['record'];
     if (rawRecord is! Map) return null;
     final record = Map<String, dynamic>.from(rawRecord);
+    if (record['admin_deleted_at'] != null) return null;
     final recipientId = record['recipient_tag']?.toString() ?? '';
     final senderId = record['user_id']?.toString() ?? '';
     final conversationId = record['conversation_id']?.toString() ?? '';
