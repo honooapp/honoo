@@ -250,6 +250,6 @@ class _EmailVerifyPageState extends State<EmailVerifyPage> {
       ),
     );
 
-    return HonooScaffold(body: content);
+    return HonooScaffold(showBack: true, body: content);
   }
 }

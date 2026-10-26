@@ -1,3 +1,4 @@
+import '../Widgets/honoo_back_button.dart';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -447,6 +448,11 @@ class _CasaBuilderPageState extends State<CasaBuilderPage> {
             fit: StackFit.expand,
             children: [
               Center(child: content),
+              Positioned(
+                top: MediaQuery.of(context).viewPadding.top + 12,
+                left: 8,
+                child: HonooBackButton(enabled: !_isSaving),
+              ),
               if (_error != null)
                 Positioned(
                   left: 24,

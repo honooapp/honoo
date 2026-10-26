@@ -1,3 +1,4 @@
+import 'honoo_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:honoo/Utility/honoo_colors.dart';
 
@@ -10,11 +11,13 @@ class HonooScaffold extends StatelessWidget {
     super.key,
     required this.body,
     this.showFooter = false,
+    this.showBack = false,
     this.footer,
   });
 
   final Widget body;
   final bool showFooter;
+  final bool showBack;
   final Widget? footer;
 
   @override
@@ -26,16 +29,24 @@ class HonooScaffold extends StatelessWidget {
           children: [
             SizedBox(
               height: 52,
-              child: Center(
-                child: HonooAppTitle(
-                  onTap: () {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                          builder: (_) => const PlaceholderPage()),
-                      (route) => false,
-                    );
-                  },
-                ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Center(
+                    child: HonooAppTitle(
+                      onTap: () {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                            builder: (_) => const PlaceholderPage(),
+                          ),
+                          (route) => false,
+                        );
+                      },
+                    ),
+                  ),
+                  if (showBack)
+                    const Positioned(left: 8, child: HonooBackButton()),
+                ],
               ),
             ),
             Expanded(child: body),

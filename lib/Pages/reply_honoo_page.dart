@@ -1,3 +1,4 @@
+import '../Widgets/honoo_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:honoo/Services/honoo_service.dart';
 import 'package:honoo/UI/honoo_builder.dart';
@@ -186,7 +187,19 @@ class _ReplyHonooPageState extends State<ReplyHonooPage> {
         maintainBottomViewPadding: true,
         child: Column(
           children: [
-            const SizedBox(height: 52, child: Center(child: HonooAppTitle())),
+            SizedBox(
+              height: 52,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Center(child: HonooAppTitle()),
+                  Positioned(
+                    left: 8,
+                    child: HonooBackButton(enabled: !_isSending),
+                  ),
+                ],
+              ),
+            ),
             Expanded(
               child: HonooBuilder(
                 onHonooChanged: _onHonooChanged,

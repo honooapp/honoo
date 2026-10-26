@@ -1,3 +1,4 @@
+import '../Widgets/honoo_back_button.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -1260,7 +1261,14 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     if (!_authResolved) {
       return const Scaffold(
         backgroundColor: HonooColor.background,
-        body: Center(child: LoadingSpinner(color: Colors.white)),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Center(child: LoadingSpinner(color: Colors.white)),
+              Positioned(top: 2, left: 8, child: HonooBackButton()),
+            ],
+          ),
+        ),
       );
     }
     return AnimatedBuilder(
@@ -1319,12 +1327,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
               if (widget.casaFilter != null)
                 PositionedDirectional(
                   start: 8,
-                  child: IconButton(
-                    tooltip: 'Indietro',
-                    color: pageStyle.foregroundColor,
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: () => Navigator.of(context).maybePop(),
-                  ),
+                  child: HonooBackButton(color: pageStyle.foregroundColor),
                 ),
             ],
           ),

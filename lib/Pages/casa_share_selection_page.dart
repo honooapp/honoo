@@ -1,3 +1,4 @@
+import '../Widgets/honoo_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -27,56 +28,74 @@ class CasaChestFilterPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: HonooColor.background,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxHeight < 650;
-            final iconSize = compact ? 72.0 : 96.0;
-            final spacing = compact ? 28.0 : 46.0;
-            return Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 32,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _ShareIcon(
-                      key: const ValueKey('house-chest-home'),
-                      label: CasaChestFilter.authored.label,
-                      asset: 'assets/icons/honoo_chest_blue.svg',
-                      selected: false,
-                      size: iconSize,
-                      addWhiteOutline: true,
-                      onTap: () =>
-                          Navigator.of(context).pop(CasaChestFilter.authored),
-                    ),
-                    SizedBox(height: spacing),
-                    _ShareIcon(
-                      key: const ValueKey('house-chest-moon'),
-                      label: CasaChestFilter.moonSaved.label,
-                      asset: 'assets/icons/honoo_chest_white.svg',
-                      selected: false,
-                      size: iconSize,
-                      onTap: () =>
-                          Navigator.of(context).pop(CasaChestFilter.moonSaved),
-                    ),
-                    SizedBox(height: spacing),
-                    _ShareIcon(
-                      key: const ValueKey('house-chest-all'),
-                      label: CasaChestFilter.all.label,
-                      asset: 'assets/icons/chest_home.svg',
-                      selected: false,
-                      size: iconSize,
-                      addWhiteOutline: true,
-                      onTap: () =>
-                          Navigator.of(context).pop(CasaChestFilter.all),
-                    ),
-                  ],
+        child: Column(
+          children: [
+            const SizedBox(
+              height: 52,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.only(left: 8),
+                  child: HonooBackButton(),
                 ),
               ),
-            );
-          },
+            ),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxHeight < 650;
+                  final iconSize = compact ? 72.0 : 96.0;
+                  final spacing = compact ? 28.0 : 46.0;
+                  return Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 32,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _ShareIcon(
+                            key: const ValueKey('house-chest-home'),
+                            label: CasaChestFilter.authored.label,
+                            asset: 'assets/icons/honoo_chest_blue.svg',
+                            selected: false,
+                            size: iconSize,
+                            addWhiteOutline: true,
+                            onTap: () => Navigator.of(
+                              context,
+                            ).pop(CasaChestFilter.authored),
+                          ),
+                          SizedBox(height: spacing),
+                          _ShareIcon(
+                            key: const ValueKey('house-chest-moon'),
+                            label: CasaChestFilter.moonSaved.label,
+                            asset: 'assets/icons/honoo_chest_white.svg',
+                            selected: false,
+                            size: iconSize,
+                            onTap: () => Navigator.of(
+                              context,
+                            ).pop(CasaChestFilter.moonSaved),
+                          ),
+                          SizedBox(height: spacing),
+                          _ShareIcon(
+                            key: const ValueKey('house-chest-all'),
+                            label: CasaChestFilter.all.label,
+                            asset: 'assets/icons/chest_home.svg',
+                            selected: false,
+                            size: iconSize,
+                            addWhiteOutline: true,
+                            onTap: () =>
+                                Navigator.of(context).pop(CasaChestFilter.all),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -99,95 +118,115 @@ class _CasaShareSelectionPageState extends State<CasaShareSelectionPage> {
     return Scaffold(
       backgroundColor: HonooColor.background,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxHeight < 650;
-            final iconSize = compact ? 72.0 : 96.0;
-            final spacing = compact ? 18.0 : 32.0;
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 96),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight - 124,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'cosa vuoi mostrare?',
-                          key: const ValueKey('house-share-title'),
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.arvo(
-                            color: Colors.white,
-                            fontSize: compact ? 22 : 26,
-                            fontWeight: FontWeight.w400,
+        child: Column(
+          children: [
+            const SizedBox(
+              height: 52,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.only(left: 8),
+                  child: HonooBackButton(),
+                ),
+              ),
+            ),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxHeight < 650;
+                  final iconSize = compact ? 72.0 : 96.0;
+                  final spacing = compact ? 18.0 : 32.0;
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(24, 28, 24, 96),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight - 124,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'cosa vuoi mostrare?',
+                                key: const ValueKey('house-share-title'),
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.arvo(
+                                  color: Colors.white,
+                                  fontSize: compact ? 22 : 26,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                              SizedBox(height: compact ? 24 : 40),
+                              _ShareIcon(
+                                key: const ValueKey('house-share-home'),
+                                label: CasaShareMode.home.label,
+                                asset: 'assets/icons/honoo_chest_blue.svg',
+                                selected: _selected.contains(
+                                  CasaShareMode.home,
+                                ),
+                                size: iconSize,
+                                addWhiteOutline: true,
+                                onTap: () => _toggle(CasaShareMode.home),
+                              ),
+                              SizedBox(height: spacing),
+                              _ShareIcon(
+                                key: const ValueKey('house-share-moon'),
+                                label: CasaShareMode.moon.label,
+                                asset: 'assets/icons/honoo_chest_white.svg',
+                                selected: _selected.contains(
+                                  CasaShareMode.moon,
+                                ),
+                                size: iconSize,
+                                onTap: () => _toggle(CasaShareMode.moon),
+                              ),
+                              SizedBox(height: spacing),
+                              _ShareIcon(
+                                key: const ValueKey('house-share-all'),
+                                label: CasaShareMode.all.label,
+                                asset: 'assets/icons/chest_home.svg',
+                                selected: _selected.contains(CasaShareMode.all),
+                                size: iconSize,
+                                addWhiteOutline: true,
+                                onTap: () => _toggle(CasaShareMode.all),
+                              ),
+                            ],
                           ),
                         ),
-                        SizedBox(height: compact ? 24 : 40),
-                        _ShareIcon(
-                          key: const ValueKey('house-share-home'),
-                          label: CasaShareMode.home.label,
-                          asset: 'assets/icons/honoo_chest_blue.svg',
-                          selected: _selected.contains(CasaShareMode.home),
-                          size: iconSize,
-                          addWhiteOutline: true,
-                          onTap: () => _toggle(CasaShareMode.home),
-                        ),
-                        SizedBox(height: spacing),
-                        _ShareIcon(
-                          key: const ValueKey('house-share-moon'),
-                          label: CasaShareMode.moon.label,
-                          asset: 'assets/icons/honoo_chest_white.svg',
-                          selected: _selected.contains(CasaShareMode.moon),
-                          size: iconSize,
-                          onTap: () => _toggle(CasaShareMode.moon),
-                        ),
-                        SizedBox(height: spacing),
-                        _ShareIcon(
-                          key: const ValueKey('house-share-all'),
-                          label: CasaShareMode.all.label,
-                          asset: 'assets/icons/chest_home.svg',
-                          selected: _selected.contains(CasaShareMode.all),
-                          size: iconSize,
-                          addWhiteOutline: true,
-                          onTap: () => _toggle(CasaShareMode.all),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 20,
-                  bottom: 14,
-                  child: Tooltip(
-                    message: 'Salva',
-                    preferBelow: false,
-                    child: IconButton(
-                      key: const ValueKey('house-share-confirm'),
-                      onPressed: _selected.isEmpty
-                          ? null
-                          : () => Navigator.of(
-                              context,
-                            ).pop(Set<CasaShareMode>.unmodifiable(_selected)),
-                      iconSize: compact ? 48 : 58,
-                      padding: const EdgeInsets.all(8),
-                      icon: Opacity(
-                        opacity: _selected.isEmpty ? 0.35 : 1,
-                        child: SvgPicture.asset(
-                          'assets/icons/ok.svg',
-                          width: compact ? 48 : 58,
-                          height: compact ? 48 : 58,
+                      ),
+                      Positioned(
+                        right: 20,
+                        bottom: 14,
+                        child: Tooltip(
+                          message: 'Salva',
+                          preferBelow: false,
+                          child: IconButton(
+                            key: const ValueKey('house-share-confirm'),
+                            onPressed: _selected.isEmpty
+                                ? null
+                                : () => Navigator.of(context).pop(
+                                    Set<CasaShareMode>.unmodifiable(_selected),
+                                  ),
+                            iconSize: compact ? 48 : 58,
+                            padding: const EdgeInsets.all(8),
+                            icon: Opacity(
+                              opacity: _selected.isEmpty ? 0.35 : 1,
+                              child: SvgPicture.asset(
+                                'assets/icons/ok.svg',
+                                width: compact ? 48 : 58,
+                                height: compact ? 48 : 58,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

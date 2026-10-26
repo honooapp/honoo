@@ -1,3 +1,4 @@
+import '../Widgets/honoo_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -82,16 +83,7 @@ class _HouseGuestsPageState extends State<HouseGuestsPage> {
           color: Colors.white,
         ),
       ),
-      leading: IconButton(
-        tooltip: 'Indietro',
-        onPressed: () => Navigator.of(context).maybePop(),
-        icon: SvgPicture.asset(
-          'assets/icons/arrow_left.svg',
-          width: 32,
-          height: 32,
-          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-        ),
-      ),
+      leading: const HonooBackButton(),
       backgroundColor: HonooColor.background,
       foregroundColor: Colors.white,
     ),

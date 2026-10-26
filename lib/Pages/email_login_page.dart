@@ -5,7 +5,6 @@ import 'package:honoo/Widgets/honoo_dialogs.dart';
 import 'package:honoo/Services/supabase_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:honoo/Utility/honoo_colors.dart';
-import 'package:honoo/Utility/honoo_link_style.dart';
 
 import '../Widgets/honoo_scaffold.dart';
 import 'email_verify_page.dart';
@@ -116,6 +115,7 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
     );
 
     return HonooScaffold(
+      showBack: true,
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
         child: Center(
@@ -160,31 +160,6 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                 _isLoading
                     ? const Center(child: LoadingSpinner(color: Colors.white))
                     : button,
-                const SizedBox(height: 8),
-                Text(
-                  'o',
-                  style: GoogleFonts.lora(
-                    color: HonooColor.onBackground.withValues(alpha: 0.8),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w400,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: () {
-                    if (Navigator.canPop(context)) Navigator.pop(context);
-                  },
-                  child: Text(
-                    'torna indietro',
-                    textAlign: TextAlign.center,
-                    style: HonooLinkStyle.from(
-                      GoogleFonts.lora(
-                        color: HonooColor.onBackground.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),

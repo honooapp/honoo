@@ -1,13 +1,11 @@
+import '../honoo_back_button.dart';
 import 'package:flutter/material.dart';
 
 import '../../Utility/honoo_colors.dart';
 import '../honoo_app_title.dart';
 
 class ChingScaffold extends StatelessWidget {
-  const ChingScaffold({
-    super.key,
-    required this.body,
-  });
+  const ChingScaffold({super.key, required this.body});
 
   final Widget body;
 
@@ -19,23 +17,16 @@ class ChingScaffold extends StatelessWidget {
         child: Column(
           children: [
             // HEADER: back a sinistra, logo al centro
-            SizedBox(
+            const SizedBox(
               height: 56,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   Positioned(
                     left: 6,
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).maybePop(),
-                      icon: const Icon(Icons.arrow_back),
-                      color: HonooColor.background,
-                      splashRadius: 22,
-                    ),
+                    child: HonooBackButton(color: HonooColor.background),
                   ),
-                  const Center(
-                    child: HonooAppTitle(),
-                  ),
+                  Center(child: HonooAppTitle()),
                 ],
               ),
             ),

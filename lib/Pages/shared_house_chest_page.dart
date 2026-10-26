@@ -1,3 +1,4 @@
+import '../Widgets/honoo_back_button.dart';
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
@@ -144,12 +145,7 @@ class _SharedHouseChestPageState extends State<SharedHouseChestPage> {
                   ),
                   PositionedDirectional(
                     start: 8,
-                    child: IconButton(
-                      tooltip: 'Torna al campanello',
-                      color: _style.foregroundColor,
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: () => Navigator.of(context).maybePop(),
-                    ),
+                    child: HonooBackButton(color: _style.foregroundColor),
                   ),
                 ],
               ),
