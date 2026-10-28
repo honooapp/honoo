@@ -65,6 +65,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   bool _loading = true;
   Object? _loadError;
+  bool _reconnecting = false;
   List<ConversationEntry> _entries = const [];
   RealtimeChannel? _chan;
   Timer? _reconnectTimer;
@@ -174,6 +175,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
         onStatus: (status, error) {
           if (!mounted || generation != _channelGeneration) return;
           if (status == ConversationRealtimeConnectionStatus.subscribed) {
+            setState(() => _reconnecting = false);
             _reconnectAttempt = 0;
             _reconnectTimer?.cancel();
             _load();
@@ -194,6 +196,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
         _reconnectTimer?.isActive == true) {
       return;
     }
+    if (mounted) setState(() => _reconnecting = true);
     final attempt = _reconnectAttempt.clamp(0, 5);
     _reconnectAttempt += 1;
     _reconnectTimer = Timer(Duration(seconds: 1 << attempt), () {
@@ -217,6 +220,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
     _chan = null;
     unawaited(channel?.unsubscribe());
     _reconnectAttempt = 0;
+    _reconnecting = false;
   }
 
   @override
@@ -693,79 +697,106 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
     return SizedBox(
       width: widget.maxWidth,
       height: widget.maxHeight,
-      child: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(
-          dragDevices: {
-            PointerDeviceKind.touch,
-            PointerDeviceKind.mouse,
-            PointerDeviceKind.stylus,
-            PointerDeviceKind.trackpad,
-          },
-        ),
-        child: PageView.builder(
-          controller: _pageController,
-          scrollDirection: Axis.vertical,
-          pageSnapping: true,
-          physics: const PageScrollPhysics(parent: ClampingScrollPhysics()),
-          onPageChanged: (index) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) widget.onReveal?.call(null);
-            });
-            _currentPageIndex = index;
-            _prefetchEntriesFrom(index);
-            final reversed = _entries.reversed.toList(growable: false);
-            if (index >= 0 && index < reversed.length) {
-              _scheduleSelection();
-            }
-          },
-          itemCount: _entries.length,
-          itemBuilder: (context, index) => Listener(
-            onPointerSignal: _onPointerSignal,
-            child: Builder(
-              builder: (context) {
-                // Ordine inverso: ultimo (più recente) in cima
-                final revIndex = _entries.length - 1 - index;
-                final e = _entries[revIndex];
-                final Widget page = _entryCard(e);
-                if (index == _pageToShowFirst && _shouldReveal(e)) {
-                  final answeredEntry = _answeredEntryFor(e);
-                  if (answeredEntry == null) return page;
-                  final answeredPage = Transform.translate(
-                    offset: Offset(0, widget.maxHeight * 0.52),
-                    child: _entryCard(
-                      answeredEntry,
-                      keyName: 'reply_reveal_parent',
-                      showAsOwnedContent: _isOwnedByCurrentUser(answeredEntry),
+      child: Column(
+        children: [
+          if (_loadError != null || _reconnecting)
+            Semantics(
+              liveRegion: true,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _loadError != null
+                          ? 'Aggiornamento non riuscito. I contenuti potrebbero non essere aggiornati.'
+                          : 'Riconnessione…',
+                      style: const TextStyle(color: Colors.white),
                     ),
-                  );
-                  return AnimatedBuilder(
-                    animation: _liftAnimation,
-                    builder: (context, childWidget) {
-                      final double revealHeight = widget.maxHeight * 0.48;
-                      return ClipRect(
-                        child: Stack(
-                          children: [
-                            answeredPage,
-                            Transform.translate(
-                              key: const Key('reply_reveal_foreground'),
-                              offset: Offset(
-                                0,
-                                _liftAnimation.value * revealHeight,
-                              ),
-                              child: childWidget,
+                  ),
+                  TextButton(onPressed: _load, child: const Text('Riprova')),
+                ],
+              ),
+            ),
+          Expanded(
+            child: ScrollConfiguration(
+              behavior: ScrollConfiguration.of(context).copyWith(
+                dragDevices: {
+                  PointerDeviceKind.touch,
+                  PointerDeviceKind.mouse,
+                  PointerDeviceKind.stylus,
+                  PointerDeviceKind.trackpad,
+                },
+              ),
+              child: PageView.builder(
+                controller: _pageController,
+                scrollDirection: Axis.vertical,
+                pageSnapping: true,
+                physics: const PageScrollPhysics(
+                  parent: ClampingScrollPhysics(),
+                ),
+                onPageChanged: (index) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) widget.onReveal?.call(null);
+                  });
+                  _currentPageIndex = index;
+                  _prefetchEntriesFrom(index);
+                  final reversed = _entries.reversed.toList(growable: false);
+                  if (index >= 0 && index < reversed.length) {
+                    _scheduleSelection();
+                  }
+                },
+                itemCount: _entries.length,
+                itemBuilder: (context, index) => Listener(
+                  onPointerSignal: _onPointerSignal,
+                  child: Builder(
+                    builder: (context) {
+                      // Ordine inverso: ultimo (più recente) in cima
+                      final revIndex = _entries.length - 1 - index;
+                      final e = _entries[revIndex];
+                      final Widget page = _entryCard(e);
+                      if (index == _pageToShowFirst && _shouldReveal(e)) {
+                        final answeredEntry = _answeredEntryFor(e);
+                        if (answeredEntry == null) return page;
+                        final answeredPage = Transform.translate(
+                          offset: Offset(0, widget.maxHeight * 0.52),
+                          child: _entryCard(
+                            answeredEntry,
+                            keyName: 'reply_reveal_parent',
+                            showAsOwnedContent: _isOwnedByCurrentUser(
+                              answeredEntry,
                             ),
-                          ],
-                        ),
-                      );
+                          ),
+                        );
+                        return AnimatedBuilder(
+                          animation: _liftAnimation,
+                          builder: (context, childWidget) {
+                            final double revealHeight = widget.maxHeight * 0.48;
+                            return ClipRect(
+                              child: Stack(
+                                children: [
+                                  answeredPage,
+                                  Transform.translate(
+                                    key: const Key('reply_reveal_foreground'),
+                                    offset: Offset(
+                                      0,
+                                      _liftAnimation.value * revealHeight,
+                                    ),
+                                    child: childWidget,
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          child: page,
+                        );
+                      }
+                      return page;
                     },
-                    child: page,
-                  );
-                }
-                return page;
-              },
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
