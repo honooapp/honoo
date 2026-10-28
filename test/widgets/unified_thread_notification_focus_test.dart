@@ -49,6 +49,49 @@ void main() {
     return ConversationEntry.honoo(honoo);
   }
 
+  testWidgets(
+    'errore di aggiornamento conserva il contenuto e permette riprova',
+    (tester) async {
+      var fail = false;
+      var calls = 0;
+      final entries = [
+        reply(id: 'latest', owner: 'me', createdAt: '2026-07-20T11:00:00Z'),
+      ];
+      Widget page(int token) => MaterialApp(
+        home: Scaffold(
+          body: UnifiedThreadView(
+            conversationId: 'conversation-1',
+            maxWidth: 600,
+            maxHeight: 600,
+            currentUserId: 'me',
+            refreshToken: token,
+            conversationLoader: (_) async {
+              calls++;
+              if (fail) throw Exception('offline');
+              return entries;
+            },
+          ),
+        ),
+      );
+      await tester.pumpWidget(page(0));
+      await tester.pumpAndSettle();
+      fail = true;
+      await tester.pumpWidget(page(1));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Aggiornamento non riuscito'), findsOneWidget);
+      expect(
+        find.byKey(const Key('conversation-entry-background:honoo:latest')),
+        findsOneWidget,
+      );
+      fail = false;
+      await tester.tap(find.text('Riprova'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Aggiornamento non riuscito'), findsNothing);
+      expect(calls, 3);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets('la rotella completa una pagina anche con delta piccolo', (
     tester,
   ) async {

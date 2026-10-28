@@ -1,3 +1,5 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:honoo/Services/reply_draft_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,6 +21,7 @@ void main() {
   setUpAll(registerSupabaseFallbacks);
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     harness = SupabaseTestHarness(withAuthenticatedUser: true);
     harness.enableOverrides();
     final honoo = harness.stubTable('honoo');
@@ -34,6 +37,79 @@ void main() {
 
   tearDown(() {
     harness.disableOverrides();
+  });
+
+  testWidgets('recupera il testo della bozza dopo la riapertura', (
+    tester,
+  ) async {
+    final original = Honoo(
+      1,
+      'origine',
+      '',
+      '',
+      '',
+      'other',
+      HonooType.personal,
+    );
+    Widget page() => Sizer(
+      builder: (_, _, _) =>
+          MaterialApp(home: ReplyHonooPage(originalHonoo: original)),
+    );
+    await tester.pumpWidget(page());
+    await tester.pumpAndSettle();
+    tester.widget<HonooBuilder>(find.byType(HonooBuilder)).onHonooChanged!(
+      'bozza recuperabile',
+      '',
+    );
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(page());
+    await tester.pumpAndSettle();
+    final builder = tester.widget<HonooBuilder>(find.byType(HonooBuilder));
+    expect(builder.initialText, 'bozza recuperabile');
+    expect(builder.initialImageUrl, '');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('riapertura invio incerto riutilizza id e conversazione', (
+    tester,
+  ) async {
+    await ReplyDraftStore('test_user', '1').save({
+      'text': 'risposta',
+      'image': '',
+      'requestId': '11111111-1111-4111-8111-111111111111',
+      'conversationId': 'existing-conversation',
+      'recipientId': 'other',
+    });
+    final original = Honoo(
+      1,
+      'origine',
+      '',
+      '',
+      '',
+      'other',
+      HonooType.personal,
+    );
+    await tester.pumpWidget(
+      Sizer(
+        builder: (_, _, _) =>
+            MaterialApp(home: ReplyHonooPage(originalHonoo: original)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Invio da confermare. Riprova per verificarlo.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.bySemanticsLabel('Invia risposta'));
+    await tester.pumpAndSettle();
+    final chain = harness.client.from('honoo');
+    final payload =
+        verify(() => chain.insert(captureAny())).captured.single as Map;
+    expect(payload['id'], '11111111-1111-4111-8111-111111111111');
+    expect(payload['conversation_id'], 'existing-conversation');
+    expect(await ReplyDraftStore('test_user', '1').load(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets(
@@ -202,7 +278,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(result.value?.conversationId, '1');
-      expect(result.value?.replyId, 'reply-1');
+      expect(result.value?.replyId, matches(RegExp(r'^[0-9a-f-]{36}$')));
       expect(find.byType(ReplyHonooPage), findsNothing);
       expect(find.text('Rispondi'), findsOneWidget);
     },

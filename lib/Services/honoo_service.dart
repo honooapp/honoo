@@ -146,6 +146,35 @@ class HonooService {
     return id;
   }
 
+  /// A stable primary key makes retries safe even after a lost response.
+  static Future<String> publishReplyOnce(Honoo honoo, String requestId) async {
+    _validateConversationLink(honoo);
+    try {
+      await _reliability.write(
+        () async => await _client.from('honoo').insert({
+          ...honoo.toInsertMap(),
+          'id': requestId,
+        }),
+      );
+    } catch (_) {
+      // A timeout does not cancel the server insert. Confirm the exact saved
+      // content; never overwrite an existing row with an upsert.
+      final row = await _reliability.read<Map<String, dynamic>?>(
+        () async => await _client
+            .from('honoo')
+            .select()
+            .eq('id', requestId)
+            .eq('user_id', honoo.userId)
+            .maybeSingle(),
+      );
+      final payload = honoo.toInsertMap();
+      if (row == null || payload.entries.any((e) => row[e.key] != e.value)) {
+        rethrow;
+      }
+    }
+    return requestId;
+  }
+
   static void _validateConversationLink(Honoo honoo) {
     if (honoo.type != HonooType.answer) return;
     if ((honoo.replyTo ?? '').trim().isEmpty ||
