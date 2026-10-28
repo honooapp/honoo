@@ -118,7 +118,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byTooltip('Home'), findsOneWidget);
-      expect(find.byTooltip('Torna al campanello'), findsOneWidget);
+      expect(find.byTooltip('Indietro'), findsOneWidget);
       expect(find.byTooltip('Info'), findsOneWidget);
       if (kind == 'empty') {
         expect(find.byTooltip('Rispondi'), findsNothing);

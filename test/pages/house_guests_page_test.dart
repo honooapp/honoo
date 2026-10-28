@@ -150,7 +150,11 @@ void main() {
         tester.getCenter(find.text('ospiti')).dx,
         closeTo(size.width / 2, 1),
       );
-      final back = appBar.leading! as IconButton;
+      final back = tester.widget<IconButton>(
+        find.byWidgetPredicate(
+          (widget) => widget is IconButton && widget.tooltip == 'Indietro',
+        ),
+      );
       expect(
         (back.icon as SvgPicture).bytesLoader,
         isA<SvgAssetLoader>().having(
