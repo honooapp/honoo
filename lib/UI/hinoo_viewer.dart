@@ -29,10 +29,12 @@ class HinooViewer extends StatefulWidget {
     this.onDownloadTap,
     this.onDownloadCanvasTap,
     this.isReply = false,
+    this.enablePageNavigation = true,
     this.authorId,
     this.viewerUserId,
   });
   final bool isReply;
+  final bool enablePageNavigation;
   final String? authorId;
   final String? viewerUserId;
 
@@ -120,7 +122,8 @@ class _HinooViewerState extends State<HinooViewer> {
         : false;
 
     final viewer = FocusableActionDetector(
-      autofocus: true,
+      enabled: widget.enablePageNavigation,
+      autofocus: widget.enablePageNavigation,
       shortcuts: {
         LogicalKeySet(LogicalKeyboardKey.arrowUp): const _ArrowIntent(-1),
         LogicalKeySet(LogicalKeyboardKey.arrowDown): const _ArrowIntent(1),
@@ -161,7 +164,8 @@ class _HinooViewerState extends State<HinooViewer> {
                       borderRadius: BorderRadius.circular(5),
                       child: Listener(
                         onPointerSignal: (event) {
-                          if (event is PointerScrollEvent &&
+                          if (widget.enablePageNavigation &&
+                              event is PointerScrollEvent &&
                               widget.draft.pages.length > 1 &&
                               _vController.hasClients &&
                               _vController.position.haveDimensions) {

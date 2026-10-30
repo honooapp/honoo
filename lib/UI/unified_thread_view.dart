@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:honoo/Entities/hinoo.dart';
 import 'package:honoo/Entities/honoo.dart';
 import 'package:honoo/Entities/conversation_entry.dart';
@@ -81,6 +82,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
   bool _selectionScheduled = false;
   bool _routeIsCurrent = false;
   final PageController _pageController = PageController();
+  final FocusNode _historyFocusNode = FocusNode();
   late AnimationController _controller;
   late Animation<double> _liftAnimation;
 
@@ -134,10 +136,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
     ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
     _controller.addStatusListener((status) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted ||
-            !widget.isActive ||
-            _entries.isEmpty ||
-            _missingNotificationTarget) {
+        if (!mounted || !widget.isActive || _entries.isEmpty) {
           return;
         }
         final entry = _entries.reversed.elementAt(
@@ -280,6 +279,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
           ? _entries.reversed.elementAt(pageBeforeLoad)
           : null;
       final wasEmpty = _entries.isEmpty;
+      final targetWasMissing = _missingNotificationTarget;
       setState(() {
         _entries = entries;
         _loading = false;
@@ -287,7 +287,9 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
       });
       final focusWasApplied = _appliedFocusKey;
       _prefetchEntriesFrom(_pageToShowFirst);
-      if (wasEmpty) _showLatestReceivedAndReveal(forceFocus: true);
+      if (wasEmpty || (targetWasMissing && !_missingNotificationTarget)) {
+        _showLatestReceivedAndReveal(forceFocus: true);
+      }
       if (widget.isActive && _entries.isNotEmpty) {
         final hasExplicitReveal =
             (widget.revealEntryId ?? '').isNotEmpty &&
@@ -381,6 +383,10 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
         oldWidget.reconcileInterval != widget.reconcileInterval) {
       _syncSubscription();
       if (widget.isActive && !oldWidget.isActive) {
+        if (_appliedFocusKey == null) {
+          _showLatestReceivedAndReveal(forceFocus: true);
+        }
+        _historyFocusNode.requestFocus();
         _scheduleSelection();
         _load();
       } else if (!widget.isActive && oldWidget.isActive) {
@@ -404,10 +410,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
     _selectionScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _selectionScheduled = false;
-      if (!mounted ||
-          !widget.isActive ||
-          _entries.isEmpty ||
-          _missingNotificationTarget) {
+      if (!mounted || !widget.isActive || _entries.isEmpty) {
         return;
       }
       final entry = _entries.reversed.elementAt(
@@ -479,10 +482,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
   }
 
   void _showLatestReceivedAndReveal({bool forceFocus = false}) {
-    if (!widget.isActive ||
-        _entries.isEmpty ||
-        !mounted ||
-        _missingNotificationTarget) {
+    if (!widget.isActive || _entries.isEmpty || !mounted) {
       return;
     }
     final targetPage = _pageToShowFirst;
@@ -499,8 +499,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
           conversationId != widget.conversationId ||
           _appliedFocusKey != focusKey ||
           !widget.isActive ||
-          _entries.isEmpty ||
-          _missingNotificationTarget) {
+          _entries.isEmpty) {
         return;
       }
       if (_pageController.hasClients) {
@@ -604,6 +603,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
       case ConversationEntryKind.hinoo:
         card = HinooViewer(
           draft: entry.hinoo!,
+          enablePageNavigation: false,
           maxHeight: widget.maxHeight,
           maxWidth: widget.maxWidth,
           isReply: entry.hinoo!.type == HinooType.answer,
@@ -655,7 +655,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
     if (_loading) {
       return const Center(child: LoadingSpinner(color: Colors.white));
     }
-    if (_entries.isEmpty || _missingNotificationTarget) {
+    if (_entries.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -690,81 +690,128 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
         ),
       );
     }
-    return SizedBox(
-      width: widget.maxWidth,
-      height: widget.maxHeight,
-      child: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(
-          dragDevices: {
-            PointerDeviceKind.touch,
-            PointerDeviceKind.mouse,
-            PointerDeviceKind.stylus,
-            PointerDeviceKind.trackpad,
-          },
-        ),
-        child: PageView.builder(
-          controller: _pageController,
-          scrollDirection: Axis.vertical,
-          pageSnapping: true,
-          physics: const PageScrollPhysics(parent: ClampingScrollPhysics()),
-          onPageChanged: (index) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) widget.onReveal?.call(null);
-            });
-            _currentPageIndex = index;
-            _prefetchEntriesFrom(index);
-            final reversed = _entries.reversed.toList(growable: false);
-            if (index >= 0 && index < reversed.length) {
-              _scheduleSelection();
-            }
-          },
-          itemCount: _entries.length,
-          itemBuilder: (context, index) => Listener(
-            onPointerSignal: _onPointerSignal,
-            child: Builder(
-              builder: (context) {
-                // Ordine inverso: ultimo (più recente) in cima
-                final revIndex = _entries.length - 1 - index;
-                final e = _entries[revIndex];
-                final Widget page = _entryCard(e);
-                if (index == _pageToShowFirst && _shouldReveal(e)) {
-                  final answeredEntry = _answeredEntryFor(e);
-                  if (answeredEntry == null) return page;
-                  final answeredPage = Transform.translate(
-                    offset: Offset(0, widget.maxHeight * 0.52),
-                    child: _entryCard(
-                      answeredEntry,
-                      keyName: 'reply_reveal_parent',
-                      showAsOwnedContent: _isOwnedByCurrentUser(answeredEntry),
+    return Focus(
+      focusNode: _historyFocusNode,
+      autofocus: widget.isActive,
+      canRequestFocus: widget.isActive,
+      onKeyEvent: (_, event) {
+        if (!widget.isActive || event is KeyUpEvent) {
+          return KeyEventResult.ignored;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+          _navigateHistory(1);
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+          _navigateHistory(-1);
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: SizedBox(
+        width: widget.maxWidth,
+        height: widget.maxHeight,
+        child: Column(
+          children: [
+            if (_missingNotificationTarget)
+              Material(
+                color: HonooColor.background,
+                child: ListTile(
+                  title: const Text(
+                    'La risposta notificata non è ancora disponibile.',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  trailing: TextButton(
+                    onPressed: _load,
+                    child: const Text(
+                      'Riprova',
+                      style: TextStyle(color: Colors.white),
                     ),
-                  );
-                  return AnimatedBuilder(
-                    animation: _liftAnimation,
-                    builder: (context, childWidget) {
-                      final double revealHeight = widget.maxHeight * 0.48;
-                      return ClipRect(
-                        child: Stack(
-                          children: [
-                            answeredPage,
-                            Transform.translate(
-                              key: const Key('reply_reveal_foreground'),
-                              offset: Offset(
-                                0,
-                                _liftAnimation.value * revealHeight,
+                  ),
+                ),
+              ),
+            Expanded(
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(
+                  dragDevices: {
+                    PointerDeviceKind.touch,
+                    PointerDeviceKind.mouse,
+                    PointerDeviceKind.stylus,
+                    PointerDeviceKind.trackpad,
+                  },
+                ),
+                child: PageView.builder(
+                  controller: _pageController,
+                  scrollDirection: Axis.vertical,
+                  pageSnapping: true,
+                  physics: const PageScrollPhysics(
+                    parent: ClampingScrollPhysics(),
+                  ),
+                  onPageChanged: (index) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) widget.onReveal?.call(null);
+                    });
+                    _currentPageIndex = index;
+                    _prefetchEntriesFrom(index);
+                    final reversed = _entries.reversed.toList(growable: false);
+                    if (index >= 0 && index < reversed.length) {
+                      _scheduleSelection();
+                    }
+                  },
+                  itemCount: _entries.length,
+                  itemBuilder: (context, index) => Listener(
+                    onPointerSignal: _onPointerSignal,
+                    child: Builder(
+                      builder: (context) {
+                        // Ordine inverso: ultimo (più recente) in cima
+                        final revIndex = _entries.length - 1 - index;
+                        final e = _entries[revIndex];
+                        final Widget page = _entryCard(e);
+                        if (index == _pageToShowFirst && _shouldReveal(e)) {
+                          final answeredEntry = _answeredEntryFor(e);
+                          if (answeredEntry == null) return page;
+                          final answeredPage = Transform.translate(
+                            offset: Offset(0, widget.maxHeight * 0.52),
+                            child: _entryCard(
+                              answeredEntry,
+                              keyName: 'reply_reveal_parent',
+                              showAsOwnedContent: _isOwnedByCurrentUser(
+                                answeredEntry,
                               ),
-                              child: childWidget,
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                    child: page,
-                  );
-                }
-                return page;
-              },
+                          );
+                          return AnimatedBuilder(
+                            animation: _liftAnimation,
+                            builder: (context, childWidget) {
+                              final double revealHeight =
+                                  widget.maxHeight * 0.48;
+                              return ClipRect(
+                                child: Stack(
+                                  children: [
+                                    answeredPage,
+                                    Transform.translate(
+                                      key: const Key('reply_reveal_foreground'),
+                                      offset: Offset(
+                                        0,
+                                        _liftAnimation.value * revealHeight,
+                                      ),
+                                      child: childWidget,
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            child: page,
+                          );
+                        }
+                        return page;
+                      },
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -779,21 +826,29 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
       return;
     }
     GestureBinding.instance.pointerSignalResolver.register(event, (_) {
-      if (_wheelInProgress || !_pageController.hasClients) return;
-      final target = (_currentPageIndex + (event.scrollDelta.dy > 0 ? 1 : -1))
-          .clamp(0, _entries.length - 1);
-      if (target == _currentPageIndex) return;
-      _wheelInProgress = true;
-      unawaited(
-        _pageController
-            .animateToPage(
-              target,
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutCubic,
-            )
-            .whenComplete(() => _wheelInProgress = false),
-      );
+      _navigateHistory(event.scrollDelta.dy > 0 ? 1 : -1);
     });
+  }
+
+  void _navigateHistory(int delta) {
+    if (!widget.isActive ||
+        _entries.isEmpty ||
+        _wheelInProgress ||
+        !_pageController.hasClients) {
+      return;
+    }
+    final target = (_currentPageIndex + delta).clamp(0, _entries.length - 1);
+    if (target == _currentPageIndex) return;
+    _wheelInProgress = true;
+    unawaited(
+      _pageController
+          .animateToPage(
+            target,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+          )
+          .whenComplete(() => _wheelInProgress = false),
+    );
   }
 
   // Tile helpers non più utilizzati con il rendering a lista separata
@@ -802,6 +857,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _closeSubscription();
+    _historyFocusNode.dispose();
     _pageController.dispose();
     _controller.dispose();
     super.dispose();

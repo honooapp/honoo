@@ -1314,6 +1314,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
               SizedBox(
                 width: double.infinity,
                 child: HonooAppTitle(
+                  color: pageStyle.logoColor,
                   onTap: () {
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(
