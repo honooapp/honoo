@@ -703,7 +703,7 @@ class HonooBuilderState extends State<HonooBuilder> {
                   enableInlineFormatting: true,
                 ),
               ),
-              if (widget.showCharacterCounter)
+              if (widget.showCharacterCounter && !_hideEditorActionsForCapture)
                 Positioned(
                   bottom: 8,
                   left: 0,
