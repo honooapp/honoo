@@ -54,7 +54,6 @@ class _GlobalReplyNotificationListenerState
   Timer? _notificationTimer;
   Timer? _catchUpTimer;
   int? _catchUpInFlightGeneration;
-  DateTime? _lastCatchUpAt;
   int _reconnectAttempt = 0;
   int _channelGeneration = 0;
   String? _activeUserId;
@@ -141,7 +140,6 @@ class _GlobalReplyNotificationListenerState
     }
     _closeRealtime(clearUser: false);
     _resetNotifications();
-    _lastCatchUpAt = null;
     _activeUserId = userId;
     if (userId == null) return;
     _connectChannels(userId);
@@ -257,9 +255,6 @@ class _GlobalReplyNotificationListenerState
     final eventKey =
         '${event.recipientId}:${event.kind.name}:${event.replyId ?? event.conversationId}';
     if (!_deliveredEventKeys.add(eventKey)) return;
-    if (_deliveredEventKeys.length > 4096) {
-      _deliveredEventKeys.remove(_deliveredEventKeys.first);
-    }
     _pendingEvents[eventKey] = event;
     _notificationTimer ??= Timer(
       widget.notificationBatchWindow,
@@ -275,7 +270,15 @@ class _GlobalReplyNotificationListenerState
     _pendingEvents.clear();
     final List<ReplyNotificationEvent> events;
     try {
-      events = await _onlyUnseenEvents(queuedEvents);
+      final combined = <String, ReplyNotificationEvent>{};
+      for (final item in [
+        ..._dialogEvents.values.expand((items) => items),
+        ...queuedEvents,
+      ]) {
+        combined['${item.kind.name}:${item.replyId ?? item.conversationId}'] =
+            item;
+      }
+      events = await _onlyUnseenEvents(combined.values.toList());
     } catch (_) {
       if (generation == _notificationGeneration) {
         for (final event in queuedEvents) {
@@ -283,7 +286,6 @@ class _GlobalReplyNotificationListenerState
             '${event.recipientId}:${event.kind.name}:${event.replyId ?? event.conversationId}',
           );
         }
-        _lastCatchUpAt = null;
       }
       return;
     }
@@ -417,6 +419,12 @@ class _GlobalReplyNotificationListenerState
     required List<ReplyNotificationEvent> events,
     required VoidCallback onOpen,
   }) async {
+    // Replace the existing prompt with the merged unread batch.
+    for (final previous in _notificationDialogs.toList()) {
+      _notificationDialogs.remove(previous);
+      _dialogEvents.remove(previous);
+      if (previous.isActive) previous.navigator?.removeRoute(previous);
+    }
     final route = DialogRoute<bool>(
       context: context,
       barrierDismissible: true,
@@ -445,29 +453,21 @@ class _GlobalReplyNotificationListenerState
     if (_catchUpInFlightGeneration == generation) return;
     _catchUpInFlightGeneration = generation;
     try {
-      final catchUpStartedAt = DateTime.now().toUtc();
       final seenState = await RepliesSeenTracker.load(userId: userId);
       if (!mounted || generation != _channelGeneration) return;
-      final baseline = seenState.baseline?.toUtc();
-      final lastCatchUp = _lastCatchUpAt;
-      final sinceDate =
-          baseline == null ||
-              (lastCatchUp != null && lastCatchUp.isAfter(baseline))
-          ? lastCatchUp
-          : baseline;
-      final since = sinceDate?.toIso8601String();
+      // Revisit history: a late commit can have an older created_at.
+      // Seen IDs and delivered event keys prevent duplicate notifications.
+      final since = seenState.baseline?.toUtc().toIso8601String();
       final results = await Future.wait<List<Map<String, dynamic>>>([
         ReplyCatchUpService.fetchReplies(
           userId: userId,
           kind: ReplyNotificationKind.honoo,
           since: since,
-          until: catchUpStartedAt,
         ),
         ReplyCatchUpService.fetchReplies(
           userId: userId,
           kind: ReplyNotificationKind.hinoo,
           since: since,
-          until: catchUpStartedAt,
         ),
       ]);
       if (!mounted || generation != _channelGeneration) return;
@@ -501,7 +501,6 @@ class _GlobalReplyNotificationListenerState
       for (final event in pending) {
         _handleEvent(event);
       }
-      _lastCatchUpAt = catchUpStartedAt;
     } catch (_) {
       // Il canale realtime resta attivo; il controllo periodico ritenterà.
     } finally {
@@ -615,7 +614,6 @@ class _GlobalReplyNotificationListenerState
     _authSubscription?.cancel();
     _authSubscription = null;
     _closeRealtime();
-    _lastCatchUpAt = null;
   }
 
   @override

@@ -6,6 +6,22 @@ import '../test_supabase_helper.dart';
 
 void main() {
   setUpAll(registerSupabaseFallbacks);
+  test('live recovery does not use the device clock as a boundary', () async {
+    final harness = SupabaseTestHarness()..enableOverrides();
+    addTearDown(harness.disableOverrides);
+    final chain = harness.stubTable('honoo');
+    chain.queueResponse([
+      {'id': 'late', 'created_at': '2020-01-01T00:00:00Z'},
+    ]);
+    final rows = await ReplyCatchUpService.fetchReplies(
+      userId: 'user',
+      kind: ReplyNotificationKind.honoo,
+      since: null,
+    );
+    expect(rows.single['id'], 'late');
+    verifyNever(() => chain.lte(any(), any()));
+    verifyNever(() => chain.gt(any(), any()));
+  });
   for (final kind in ReplyNotificationKind.values) {
     test('recovers more than 100 $kind replies with tied timestamps', () async {
       final harness = SupabaseTestHarness()..enableOverrides();

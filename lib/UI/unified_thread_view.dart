@@ -222,6 +222,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed || !widget.isActive) return;
     _closeSubscription();
+    _scheduleSelection();
     _load();
     _syncSubscription();
   }
@@ -423,6 +424,9 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
           entry.ownerId == null ||
           entry.ownerId == userId ||
           !_routeIsCurrent ||
+          (WidgetsBinding.instance.lifecycleState != null &&
+              WidgetsBinding.instance.lifecycleState !=
+                  AppLifecycleState.resumed) ||
           !_isReceivedReply(entry)) {
         return;
       }

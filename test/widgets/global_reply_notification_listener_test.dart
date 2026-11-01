@@ -106,6 +106,40 @@ void main() {
     verifyNever(() => hidden.delete());
   });
 
+  testWidgets('successive batches replace the prompt and retain both replies', (
+    tester,
+  ) async {
+    final navigatorKey = GlobalKey<NavigatorState>();
+    final notification = _FakeReplySystemNotification();
+    await tester.pumpWidget(
+      GlobalReplyNotificationListener(
+        navigatorKey: navigatorKey,
+        systemNotification: notification,
+        replyEventStream: events.stream,
+        child: MaterialApp(navigatorKey: navigatorKey, home: const Scaffold()),
+      ),
+    );
+    for (final id in ['first', 'second']) {
+      events.add(
+        ReplyNotificationEvent(
+          kind: ReplyNotificationKind.honoo,
+          conversationId: 'conversation',
+          senderId: 'other',
+          recipientId: 'test_user',
+          replyId: id,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('Hai ricevuto 2 nuove risposte'), findsOneWidget);
+    expect(notification.replyCount, 2);
+    await tester.tap(find.text('Ignora'));
+    await tester.pumpAndSettle();
+    expect(find.text('Hai ricevuto una nuova risposta'), findsNothing);
+  });
+
   for (final queued in [true, false]) {
     testWidgets('logout clears notifications, queued=$queued', (tester) async {
       final authEvents = StreamController<AuthState>();

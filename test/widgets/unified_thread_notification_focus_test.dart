@@ -1,3 +1,4 @@
+import 'package:honoo/Utility/replies_seen_tracker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
@@ -49,6 +50,41 @@ void main() {
           ..isFromMoonSaved = true;
     return ConversationEntry.honoo(honoo);
   }
+
+  testWidgets('background replies become read only after resume', (
+    tester,
+  ) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: UnifiedThreadView(
+            conversationId: 'conversation-1',
+            isActive: true,
+            maxWidth: 600,
+            maxHeight: 600,
+            currentUserId: 'me',
+            conversationLoader: (_) async => [
+              reply(
+                id: 'background-reply',
+                owner: 'other',
+                createdAt: '2026-07-20T10:00:00Z',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect((await RepliesSeenTracker.load(userId: 'me')).replyIds, isEmpty);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(
+      (await RepliesSeenTracker.load(userId: 'me')).replyIds,
+      contains('background-reply'),
+    );
+    await tester.pumpWidget(const SizedBox());
+  });
 
   testWidgets('la rotella completa una pagina anche con delta piccolo', (
     tester,

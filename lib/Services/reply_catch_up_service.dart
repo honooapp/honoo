@@ -7,7 +7,7 @@ class ReplyCatchUpService {
     required String userId,
     required ReplyNotificationKind kind,
     required String? since,
-    required DateTime until,
+    DateTime? until,
   }) async {
     final isHonoo = kind == ReplyNotificationKind.honoo;
     final rows = <Map<String, dynamic>>[];
@@ -20,8 +20,10 @@ class ReplyCatchUpService {
           )
           .eq(isHonoo ? 'destination' : 'type', isHonoo ? 'reply' : 'answer')
           .eq('recipient_tag', userId)
-          .is_('admin_deleted_at', null)
-          .lte('created_at', until.toUtc().toIso8601String());
+          .is_('admin_deleted_at', null);
+      if (until != null) {
+        query = query.lte('created_at', until.toUtc().toIso8601String());
+      }
       if (since != null) query = query.gt('created_at', since);
       if (cursor != null) {
         final time = cursor['created_at'];

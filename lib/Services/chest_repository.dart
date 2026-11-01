@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_provider.dart';
+import '../Utility/reply_notification_signal.dart';
 import 'chest_recipient_filter.dart';
 import 'reliability_policy.dart';
 
@@ -37,6 +38,7 @@ class ChestRepository {
         'conversation_id': conversationId,
       }),
     );
+    ReplyNotificationSignal.notifyChanged();
   }
 
   Future<Set<String>> fetchHinooMoonFingerprints(String userId) async {

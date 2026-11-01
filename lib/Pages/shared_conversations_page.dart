@@ -30,6 +30,7 @@ class SharedConversationsPage extends StatefulWidget {
 class _SharedConversationsPageState extends State<SharedConversationsPage> {
   List<String> _conversationIds = const [];
   bool _isLoadingRoots = true;
+  bool _loadFailed = false;
   int _currentRootIndex = 0;
   final cs.CarouselSliderController _rootCarousel =
       cs.CarouselSliderController();
@@ -42,7 +43,10 @@ class _SharedConversationsPageState extends State<SharedConversationsPage> {
   }
 
   Future<void> _loadConversations() async {
-    setState(() => _isLoadingRoots = true);
+    setState(() {
+      _isLoadingRoots = true;
+      _loadFailed = false;
+    });
     try {
       final rows = await _contentFeedService.fetchSharedConversationRoots(
         widget.ownerId,
@@ -67,7 +71,10 @@ class _SharedConversationsPageState extends State<SharedConversationsPage> {
         stackTrace: stackTrace,
       );
       if (!mounted) return;
-      setState(() => _isLoadingRoots = false);
+      setState(() {
+        _isLoadingRoots = false;
+        _loadFailed = true;
+      });
     }
   }
 
@@ -93,6 +100,22 @@ class _SharedConversationsPageState extends State<SharedConversationsPage> {
       bodyBuilder: (context, viewW, availableH, layoutMode) {
         final Widget threads = _isLoadingRoots
             ? const Center(child: LoadingSpinner(color: Colors.white))
+            : _loadFailed
+            ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Impossibile caricare le conversazioni.',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    TextButton(
+                      onPressed: _loadConversations,
+                      child: const Text('Riprova'),
+                    ),
+                  ],
+                ),
+              )
             : (_conversationIds.isEmpty
                   ? Center(
                       child: Text(
