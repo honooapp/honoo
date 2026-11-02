@@ -46,3 +46,42 @@ class ReplyCatchUpService {
     }
   }
 }
+
+/// Per-kind database cursors; never use the device clock to exclude replies.
+/// Every tenth successful poll revisits history for arbitrarily late commits.
+class ReplyRecoveryWindow {
+  final _latest = <ReplyNotificationKind, DateTime>{};
+  int _polls = 0;
+
+  String? since(ReplyNotificationKind kind, DateTime? baseline) {
+    final latest = _latest[kind];
+    final overlap = latest?.subtract(const Duration(minutes: 2));
+    final start = _polls % 10 == 0 || overlap == null
+        ? baseline
+        : baseline != null && baseline.isAfter(overlap)
+        ? baseline
+        : overlap;
+    return start?.toUtc().toIso8601String();
+  }
+
+  void record(List<List<Map<String, dynamic>>> results) {
+    for (var i = 0; i < results.length; i++) {
+      final kind = i == 0
+          ? ReplyNotificationKind.honoo
+          : ReplyNotificationKind.hinoo;
+      for (final row in results[i]) {
+        final time = DateTime.tryParse(row['created_at']?.toString() ?? '');
+        if (time != null &&
+            (_latest[kind] == null || time.isAfter(_latest[kind]!))) {
+          _latest[kind] = time;
+        }
+      }
+    }
+    _polls++;
+  }
+
+  void reset() {
+    _latest.clear();
+    _polls = 0;
+  }
+}

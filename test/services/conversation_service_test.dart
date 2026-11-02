@@ -41,6 +41,30 @@ void main() {
     if (deleted) 'admin_deleted_at': '2026-01-02T10:00:00Z',
   };
 
+  for (final legacy in [false, true]) {
+    test('paginates history including legacy descendants=$legacy', () async {
+      final honoo = harness.stubTable('honoo');
+      harness.stubTable('hinoo');
+      if (legacy) honoo.queueResponse([historyRow('root')]);
+      honoo.queueResponse(
+        List.generate(
+          100,
+          (i) => historyRow(
+            'item-${i.toString().padLeft(3, '0')}',
+            conversation: legacy ? null : 'root',
+          ),
+        ),
+      );
+      honoo.queueResponse([
+        historyRow('tail', conversation: legacy ? null : 'root'),
+      ]);
+      final entries = await ConversationService.fetchConversation('root');
+      expect(entries, hasLength(legacy ? 102 : 101));
+      expect(entries.map((e) => e.id), contains('tail'));
+      verify(() => honoo.gt('id', 'item-099')).called(1);
+    });
+  }
+
   test(
     'recupera tutti gli antenati misti anche riaprendo lo scrigno',
     () async {

@@ -40,8 +40,8 @@ class MockQueryChain extends Mock
       // callback `then` invocate sincronicamente durante la registrazione.
       final response = _nextResponse();
       // ignore: prefer_void_to_null, il mock deve rispettare R=Null di Future.then.
-      return Future<Null>.microtask(() {
-        onValue(response);
+      return Future<Null>.microtask(() async {
+        onValue(await response);
         return null;
       });
     }

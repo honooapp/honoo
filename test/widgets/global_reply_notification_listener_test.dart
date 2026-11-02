@@ -140,6 +140,85 @@ void main() {
     expect(find.text('Hai ricevuto una nuova risposta'), findsNothing);
   });
 
+  testWidgets(
+    'a new notification opens while the previous chest is still open',
+    (tester) async {
+      final navigatorKey = GlobalKey<NavigatorState>();
+      final notification = _FakeReplySystemNotification();
+      await tester.pumpWidget(
+        GlobalReplyNotificationListener(
+          navigatorKey: navigatorKey,
+          systemNotification: notification,
+          replyEventStream: events.stream,
+          child: MaterialApp(
+            navigatorKey: navigatorKey,
+            home: const Scaffold(),
+          ),
+        ),
+      );
+      for (final id in ['first', 'second']) {
+        events.add(
+          ReplyNotificationEvent(
+            kind: ReplyNotificationKind.honoo,
+            conversationId: id,
+            senderId: 'other',
+            recipientId: 'test_user',
+            replyId: id,
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Apri'));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<ChestPage>(find.byType(ChestPage)).focusReplyId,
+          id,
+        );
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('slow filtering serializes batches without losing replies', (
+    tester,
+  ) async {
+    final hidden = harness.stubTable('chest_hidden_conversations');
+    final gate = Completer<List<dynamic>>();
+    hidden.queueResponse(gate.future);
+    final navigatorKey = GlobalKey<NavigatorState>();
+    final notification = _FakeReplySystemNotification();
+    await tester.pumpWidget(
+      GlobalReplyNotificationListener(
+        navigatorKey: navigatorKey,
+        systemNotification: notification,
+        replyEventStream: events.stream,
+        child: MaterialApp(navigatorKey: navigatorKey, home: const Scaffold()),
+      ),
+    );
+    for (final id in ['first', 'second']) {
+      events.add(
+        ReplyNotificationEvent(
+          kind: ReplyNotificationKind.honoo,
+          conversationId: 'conversation',
+          senderId: 'other',
+          recipientId: 'test_user',
+          replyId: id,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+    expect(notification.showCount, 0);
+    gate.complete([]);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(notification.replyCount, 2);
+    expect(find.text('Hai ricevuto 2 nuove risposte'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   for (final queued in [true, false]) {
     testWidgets('logout clears notifications, queued=$queued', (tester) async {
       final authEvents = StreamController<AuthState>();

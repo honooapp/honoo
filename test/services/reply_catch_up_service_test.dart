@@ -6,6 +6,31 @@ import '../test_supabase_helper.dart';
 
 void main() {
   setUpAll(registerSupabaseFallbacks);
+  test(
+    'recovery uses separate server cursors and periodically revisits history',
+    () {
+      final window = ReplyRecoveryWindow();
+      expect(window.since(ReplyNotificationKind.honoo, null), isNull);
+      window.record([
+        [
+          {'created_at': '2020-01-01T10:00:00Z'},
+        ],
+        [],
+      ]);
+      expect(
+        window.since(ReplyNotificationKind.honoo, null),
+        '2020-01-01T09:58:00.000Z',
+      );
+      expect(window.since(ReplyNotificationKind.hinoo, null), isNull);
+      for (var i = 0; i < 9; i++) {
+        window.record([[], []]);
+      }
+      expect(window.since(ReplyNotificationKind.honoo, null), isNull);
+      window.record([[], []]);
+      window.reset();
+      expect(window.since(ReplyNotificationKind.honoo, null), isNull);
+    },
+  );
   test('live recovery does not use the device clock as a boundary', () async {
     final harness = SupabaseTestHarness()..enableOverrides();
     addTearDown(harness.disableOverrides);

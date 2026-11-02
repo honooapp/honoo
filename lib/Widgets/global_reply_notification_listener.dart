@@ -66,7 +66,9 @@ class _GlobalReplyNotificationListenerState
   int _notificationGeneration = 0;
   final Set<DialogRoute<bool>> _notificationDialogs = {};
   final Map<DialogRoute<bool>, List<ReplyNotificationEvent>> _dialogEvents = {};
-  bool _openingReplies = false;
+  int _openingRequest = 0;
+  bool _flushingEvents = false;
+  final _recoveryWindow = ReplyRecoveryWindow();
 
   bool _homeReplayPending = false;
 
@@ -264,6 +266,22 @@ class _GlobalReplyNotificationListenerState
 
   Future<void> _flushPendingEvents() async {
     _notificationTimer = null;
+    if (_flushingEvents) return;
+    _flushingEvents = true;
+    try {
+      await _flushNextEvents();
+    } finally {
+      _flushingEvents = false;
+      if (mounted && _pendingEvents.isNotEmpty && _notificationTimer == null) {
+        _notificationTimer = Timer(
+          widget.notificationBatchWindow,
+          _flushPendingEvents,
+        );
+      }
+    }
+  }
+
+  Future<void> _flushNextEvents() async {
     if (!mounted || _pendingEvents.isEmpty) return;
     final generation = _notificationGeneration;
     final queuedEvents = _pendingEvents.values.toList(growable: false);
@@ -455,22 +473,23 @@ class _GlobalReplyNotificationListenerState
     try {
       final seenState = await RepliesSeenTracker.load(userId: userId);
       if (!mounted || generation != _channelGeneration) return;
-      // Revisit history: a late commit can have an older created_at.
-      // Seen IDs and delivered event keys prevent duplicate notifications.
-      final since = seenState.baseline?.toUtc().toIso8601String();
+      // Bound routine polls using database timestamps, with periodic full
+      // reconciliation for transactions committed outside the overlap window.
+      final baseline = seenState.baseline;
       final results = await Future.wait<List<Map<String, dynamic>>>([
         ReplyCatchUpService.fetchReplies(
           userId: userId,
           kind: ReplyNotificationKind.honoo,
-          since: since,
+          since: _recoveryWindow.since(ReplyNotificationKind.honoo, baseline),
         ),
         ReplyCatchUpService.fetchReplies(
           userId: userId,
           kind: ReplyNotificationKind.hinoo,
-          since: since,
+          since: _recoveryWindow.since(ReplyNotificationKind.hinoo, baseline),
         ),
       ]);
       if (!mounted || generation != _channelGeneration) return;
+      _recoveryWindow.record(results);
       final pending = <ReplyNotificationEvent>[];
       for (var i = 0; i < results.length; i++) {
         final kind = i == 0
@@ -515,8 +534,8 @@ class _GlobalReplyNotificationListenerState
   }
 
   Future<void> _openUnseenReplies(List<ReplyNotificationEvent> events) async {
-    if (_openingReplies) return;
-    _openingReplies = true;
+    // A newer tap supersedes the remaining destinations of an older batch.
+    final request = ++_openingRequest;
     for (final route in _notificationDialogs.toList()) {
       if (route.isActive) route.navigator?.removeRoute(route);
     }
@@ -530,7 +549,11 @@ class _GlobalReplyNotificationListenerState
         );
       for (final event in ordered) {
         final unseen = await _onlyUnseenEvents([event]);
-        if (!mounted || generation != _notificationGeneration) return;
+        if (!mounted ||
+            generation != _notificationGeneration ||
+            request != _openingRequest) {
+          return;
+        }
         if (unseen.isEmpty) continue;
         final navigator = widget.navigatorKey.currentState;
         if (navigator == null) return;
@@ -555,8 +578,6 @@ class _GlobalReplyNotificationListenerState
           ),
         );
       }
-    } finally {
-      _openingReplies = false;
     }
   }
 
@@ -569,12 +590,16 @@ class _GlobalReplyNotificationListenerState
     _replyChannel?.unsubscribe();
     _replyChannel = null;
     _reconnectAttempt = 0;
-    if (clearUser) _activeUserId = null;
+    if (clearUser) {
+      _activeUserId = null;
+      _recoveryWindow.reset();
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
+    _recoveryWindow.reset();
     final userId = _activeUserId;
     if (userId == null) return;
     if (_replyChannel == null) {

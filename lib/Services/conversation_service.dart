@@ -23,31 +23,28 @@ class ConversationService {
   static Future<List<ConversationEntry>> _fetchConversation(
     String conversationId,
   ) async {
-    final rows = await Future.wait<dynamic>([
-      _client
-          .from('honoo')
-          .select(_honooColumns)
-          .or(
-            'conversation_id.eq.$conversationId,and(conversation_id.is.null,or(id.eq.$conversationId,reply_to.eq.$conversationId))',
-          )
-          .order('created_at', ascending: true),
-      _client
-          .from('hinoo')
-          .select(_hinooColumns)
-          .or(
-            'conversation_id.eq.$conversationId,and(conversation_id.is.null,or(id.eq.$conversationId,reply_to.eq.$conversationId))',
-          )
-          .order('created_at', ascending: true),
-      _client
-          .from('conversation_tombstones')
-          .select('content_id,conversation_id,original_created_at')
-          .eq('conversation_id', conversationId)
-          .order('original_created_at', ascending: true),
+    final rows = await Future.wait<List<dynamic>>([
+      for (final table in ['honoo', 'hinoo'])
+        _allRows(
+          () => _client
+              .from(table)
+              .select(table == 'honoo' ? _honooColumns : _hinooColumns)
+              .or(
+                'conversation_id.eq.$conversationId,and(conversation_id.is.null,or(id.eq.$conversationId,reply_to.eq.$conversationId))',
+              ),
+        ),
+      _allRows(
+        () => _client
+            .from('conversation_tombstones')
+            .select('content_id,conversation_id,original_created_at')
+            .eq('conversation_id', conversationId),
+        idColumn: 'content_id',
+      ),
     ]);
-    final honooRows = List<dynamic>.of(rows[0] as List);
-    final hinooRows = List<dynamic>.of(rows[1] as List);
+    final honooRows = List<dynamic>.of(rows[0]);
+    final hinooRows = List<dynamic>.of(rows[1]);
     await _completeHistory(conversationId, honooRows, hinooRows);
-    final tombstoneRows = rows[2] as List;
+    final tombstoneRows = rows[2];
 
     final entries = <_Entry>[];
     for (final r in honooRows) {
@@ -189,11 +186,13 @@ class ConversationService {
                     .from(table)
                     .select(table == 'honoo' ? _honooColumns : _hinooColumns)
                     .in_('id', batch)
-              : _client
-                    .from(table)
-                    .select(table == 'honoo' ? _honooColumns : _hinooColumns)
-                    .in_('reply_to', batch)
-                    .is_('conversation_id', null),
+              : _allRows(
+                  () => _client
+                      .from(table)
+                      .select(table == 'honoo' ? _honooColumns : _hinooColumns)
+                      .in_('reply_to', batch)
+                      .is_('conversation_id', null),
+                ),
       ]);
       for (var tableIndex = 0; tableIndex < results.length; tableIndex++) {
         for (final row in results[tableIndex] as List) {
@@ -211,6 +210,25 @@ class ConversationService {
           );
         }
       }
+    }
+  }
+
+  // Keyset pagination avoids API row caps and offset shifts during inserts.
+  // Final chronology is established by _orderEntries after history completion.
+  static Future<List<dynamic>> _allRows(
+    dynamic Function() query, {
+    String idColumn = 'id',
+  }) async {
+    final rows = <dynamic>[];
+    String? cursor;
+    while (true) {
+      dynamic pageQuery = query();
+      if (cursor != null) pageQuery = pageQuery.gt(idColumn, cursor);
+      final page =
+          await pageQuery.order(idColumn, ascending: true).limit(100) as List;
+      rows.addAll(page);
+      if (page.length < 100) return rows;
+      cursor = page.last[idColumn].toString();
     }
   }
 
