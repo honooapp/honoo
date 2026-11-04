@@ -254,15 +254,12 @@ void main() {
         expect(payload['conversation_id'], conversationId);
         Navigator.of(tester.element(editor)).pop(savedId);
         await tester.pumpAndSettle();
-        expect(find.textContaining('Bussata inviata.'), findsOneWidget);
+        expect(find.text('Bussata inviata'), findsOneWidget);
         Navigator.of(
-          tester.element(find.textContaining('Bussata inviata.')),
+          tester.element(find.text('Bussata inviata')),
         ).pop();
         await tester.pumpAndSettle();
-        final knock =
-            verify(() => houseAccess.insert(captureAny())).captured.single
-                as Map<String, dynamic>;
-        expect(knock[isHonoo ? 'honoo_id' : 'hinoo_id'], savedId);
+        verifyNever(() => houseAccess.insert(any()));
       }
 
       // Recupera anche un permesso concesso mentre realtime era assente.
