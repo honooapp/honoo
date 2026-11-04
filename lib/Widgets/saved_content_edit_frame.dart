@@ -17,7 +17,9 @@ class SavedContentEditFrame extends StatelessWidget {
     this.hinoo,
     this.hinooId,
     this.ownerId,
+    this.overlayControls = false,
   });
+  final bool overlayControls;
   final Widget child;
   final double width;
   final double height;
@@ -56,6 +58,7 @@ class SavedContentEditFrame extends StatelessWidget {
     }
 
     return ContentEditFrame(
+      overlayControls: overlayControls,
       width: width,
       height: height,
       onImage: () => edit(true),
