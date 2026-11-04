@@ -639,6 +639,7 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
       color: style.backgroundColor,
       child: SizedBox.expand(
         child: SavedContentEditFrame(
+          overlayControls: true,
           width: entry.honoo != null
               ? math.min(widget.maxWidth, (widget.maxHeight - 9.5) / 1.5)
               : math.min(widget.maxWidth, widget.maxHeight * 9 / 16),

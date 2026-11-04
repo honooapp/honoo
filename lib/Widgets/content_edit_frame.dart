@@ -13,7 +13,9 @@ class ContentEditFrame extends StatelessWidget {
     required this.onImage,
     required this.onText,
     this.onSave,
+    this.overlayControls = false,
   });
+  final bool overlayControls;
   final Widget child;
   final double width;
   final double height;
@@ -24,6 +26,44 @@ class ContentEditFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
+      final controls = SizedBox(
+        height: 40,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextBoxDownloadButton(
+              key: const Key('content-edit-image'),
+              onPressed: onImage,
+              tooltip: 'Modifica immagine',
+              asset: 'assets/icons/immagine.svg',
+            ),
+            if (onSave != null)
+              TextBoxDownloadButton(
+                onPressed: onSave!,
+                tooltip: 'Conferma e salva',
+                asset: 'assets/icons/ok.svg',
+              ),
+            TextBoxDownloadButton(
+              key: const Key('content-edit-text'),
+              onPressed: onText,
+              tooltip: 'Modifica testo',
+              asset: 'assets/icons/modifica testo.svg',
+            ),
+          ],
+        ),
+      );
+      if (overlayControls) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            child,
+            Align(
+              alignment: Alignment.topCenter,
+              child: SizedBox(width: width, child: controls),
+            ),
+          ],
+        );
+      }
       final viewportHeight = constraints.maxHeight.isFinite
           ? constraints.maxHeight
           : height + 40;
@@ -36,32 +76,7 @@ class ContentEditFrame extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  SizedBox(
-                    height: 40,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        TextBoxDownloadButton(
-                          key: const Key('content-edit-image'),
-                          onPressed: onImage,
-                          tooltip: 'Modifica immagine',
-                          asset: 'assets/icons/immagine.svg',
-                        ),
-                        if (onSave != null)
-                          TextBoxDownloadButton(
-                            onPressed: onSave!,
-                            tooltip: 'Conferma e salva',
-                            asset: 'assets/icons/ok.svg',
-                          ),
-                        TextBoxDownloadButton(
-                          key: const Key('content-edit-text'),
-                          onPressed: onText,
-                          tooltip: 'Modifica testo',
-                          asset: 'assets/icons/modifica testo.svg',
-                        ),
-                      ],
-                    ),
-                  ),
+                  controls,
                   SizedBox(width: width, height: height, child: child),
                 ],
               ),
