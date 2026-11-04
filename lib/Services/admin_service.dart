@@ -224,35 +224,6 @@ class AdminService {
     return null;
   }
 
-  Future<Set<String>> fetchExistingInvites(List<String> userIds) async {
-    if (userIds.isEmpty) return {};
-    final rows = await _client
-        .from('house_invites')
-        .select('user_id,status')
-        .in_('user_id', userIds);
-
-    final existing = <String>{};
-    for (final row in (rows as List)) {
-      if (row is! Map) continue;
-      final String id = row['user_id']?.toString() ?? '';
-      final String status = row['status']?.toString() ?? '';
-      if (status == 'declined') continue;
-      if (id.isNotEmpty) existing.add(id);
-    }
-    return existing;
-  }
-
-  Future<bool> hasPendingInviteForEmail(String email) async {
-    if (email.trim().isEmpty) return false;
-    final rows = await _client
-        .from('house_invites')
-        .select('id,status')
-        .ilike('email', email)
-        .in_('status', ['requested', 'pending', 'accepted']).limit(1);
-    if (rows is! List || rows.isEmpty) return false;
-    return true;
-  }
-
   Future<List<Map<String, dynamic>>> fetchPendingInvites(
       {bool newestFirst = true}) async {
     final rows = await _client
@@ -277,75 +248,39 @@ class AdminService {
     return rows is List && rows.isNotEmpty;
   }
 
-  Future<Set<String>> fetchExistingCaseOwners(List<String> userIds) async {
-    if (userIds.isEmpty) return {};
-    final rows =
-        await _client.from('case').select('owner_id').in_('owner_id', userIds);
-
-    final existing = <String>{};
-    for (final row in (rows as List)) {
-      if (row is! Map) continue;
-      final String id = row['owner_id']?.toString() ?? '';
-      if (id.isNotEmpty) existing.add(id);
-    }
-    return existing;
-  }
-
   Future<int> inviteUsers({
     required String adminUid,
     required List<String> userIds,
     Map<String, String>? userEmails,
   }) async {
-    final filtered = userIds.where((id) => id.trim().isNotEmpty).toList();
-    if (filtered.isEmpty) return 0;
-
-    final existing = await fetchExistingInvites(filtered);
-    final existingCases = await fetchExistingCaseOwners(filtered);
-    final toInsert = filtered
-        .where((id) =>
-            !existing.contains(id) &&
-            !existingCases.contains(id))
-        .toList();
-    if (toInsert.isEmpty) return 0;
-
-    final payload = toInsert
-        .map(
-          (id) => {
-            'user_id': id,
-            'invited_by': adminUid,
-            'status': 'pending',
-            'created_at': DateTime.now().toIso8601String(),
-            if (userEmails != null && userEmails[id] != null)
-              'email': userEmails[id],
-          },
-        )
-        .toList();
-
-    await _client.from('house_invites').insert(payload);
-    if (userEmails != null) {
-      for (final id in toInsert) {
-        final email = userEmails[id];
-        if (email == null || email.isEmpty) continue;
-        await _sendInviteEmail(email);
-      }
+    var count = 0;
+    for (final id in userIds.where((id) => id.isNotEmpty).toSet()) {
+      if (await _invite(id, userEmails?[id])) count++;
     }
-    return toInsert.length;
+    return count;
   }
 
   Future<bool> inviteByEmailOnly({
     required String adminUid,
     required String email,
-  }) async {
-    if (email.trim().isEmpty) return false;
-    final exists = await hasPendingInviteForEmail(email);
-    if (exists) return false;
-    await _client.from('house_invites').insert({
-      'user_id': null,
-      'email': email,
-      'invited_by': adminUid,
-      'status': 'pending',
-      'created_at': DateTime.now().toIso8601String(),
+  }) async => email.trim().isNotEmpty && await _invite(null, email);
+
+  Future<bool> _invite(String? userId, String? email) async {
+    final recipient = email?.trim().toLowerCase();
+    final id = await _client.rpc('prepare_house_invite', params: {
+      'p_user_id': userId, 'p_email': recipient,
     });
+    if (id == null) return false;
+    if (recipient == null || recipient.isEmpty) return true;
+    try {
+      await _client.auth.signInWithOtp(email: recipient, shouldCreateUser: userId == null);
+    } catch (_) {
+      await _client.from('house_invites').update({'delivery_lease_until': null}).eq('id', id);
+      rethrow;
+    }
+    await _client.from('house_invites').update({
+      'email_delivery_pending': false, 'delivery_lease_until': null,
+    }).eq('id', id);
     return true;
   }
 
@@ -376,18 +311,4 @@ class AdminService {
     }
   }
 
-  Future<void> _sendInviteEmail(String email) async {
-    for (int attempt = 0; attempt < 2; attempt++) {
-      try {
-        await _client.auth.signInWithOtp(
-          email: email,
-          shouldCreateUser: false,
-        );
-        return;
-      } catch (e) {
-        if (attempt == 1) rethrow;
-        await Future.delayed(const Duration(milliseconds: 300));
-      }
-    }
-  }
 }

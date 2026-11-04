@@ -30,7 +30,6 @@ import 'package:honoo/Widgets/casa_section.dart';
 import 'package:honoo/Widgets/house_invite_dialogs.dart';
 import 'package:honoo/Entities/honoo.dart';
 import 'package:honoo/Widgets/desktop_carousel_arrows.dart';
-import 'package:honoo/Widgets/busy_overlay.dart';
 import 'package:honoo/Services/campanelli_repository.dart';
 import 'package:honoo/Services/house_invite_prompt_controller.dart';
 import 'package:honoo/Services/house_invite_service.dart';
@@ -81,7 +80,6 @@ class _CampanelliPageState extends State<CampanelliPage>
   bool _showCarouselArrows = true;
   Timer? _carouselHintTimer;
   bool _isKnocking = false;
-  DialogRoute<void>? _busyRoute;
   Timer? _accessRefreshTimer;
   bool _refreshingAccess = false;
   bool _isShowingKnockRequest = false;
@@ -100,24 +98,6 @@ class _CampanelliPageState extends State<CampanelliPage>
   static const String userCampanelloBg = 'assets/background.png';
   static const String scrignoOverlay = 'assets/icons/scrigno_di_carta.png';
   final Set<String> _unlockedCampanelli = <String>{};
-
-  void _showBusyOverlay(String message) {
-    if (!mounted) return;
-    if (_busyRoute != null) return;
-    final route = DialogRoute<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => BusyOverlay(message: message),
-    );
-    _busyRoute = route;
-    unawaited(Navigator.of(context, rootNavigator: true).push(route));
-  }
-
-  void _hideBusyOverlay() {
-    final route = _busyRoute;
-    _busyRoute = null;
-    if (route != null && route.isActive) route.navigator?.removeRoute(route);
-  }
 
   Future<void> _refreshAccess() async {
     final user = SupabaseProvider.client.auth.currentUser;
@@ -361,42 +341,8 @@ class _CampanelliPageState extends State<CampanelliPage>
         ),
       );
       if (contentId == null || contentId.isEmpty || !mounted) return;
-      _showBusyOverlay('Sto bussando');
-      try {
-        await _campanelliController.sendHouseKnock(
-          targetHouseTag: targetTag,
-          visitorId: user.id,
-          honooId: kind == HouseKnockContent.honoo ? contentId : null,
-          hinooId: kind == HouseKnockContent.hinoo ? contentId : null,
-        );
-        _hideBusyOverlay();
-        if (mounted) {
-          showHonooToast(
-            context,
-            message:
-                'Bussata inviata. Il proprietario la troverà anche quando torna online.',
-          );
-        }
-      } on TimeoutException {
-        _hideBusyOverlay();
-        if (mounted) {
-          showHonooToast(
-            context,
-            message:
-                'Il server non risponde. Non posso confermare l’invio della bussata.',
-          );
-        }
-      } catch (e) {
-        debugPrint('house_access insert error: $e');
-        _hideBusyOverlay();
-        if (mounted) {
-          showHonooToast(
-            context,
-            message: 'Invio non riuscito. Ritenta tra poco.',
-          );
-        }
-      } finally {
-        _hideBusyOverlay();
+      if (mounted) {
+        showHonooToast(context, message: 'Bussata inviata.');
       }
     } finally {
       if (mounted) setState(() => _isKnocking = false);
@@ -1093,7 +1039,6 @@ class _CampanelliPageState extends State<CampanelliPage>
     _realtimeEventsSubscription.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _accessRefreshTimer?.cancel();
-    _hideBusyOverlay();
     _pageController.dispose();
     _campanelloPageController.dispose();
     _campanelliController.dispose();

@@ -93,6 +93,36 @@ void main() {
       return messenger.delegate.send('flutter/assets', message);
     });
   });
+  testWidgets('una richiesta senza conversazione arriva e si può approvare', (
+    tester,
+  ) async {
+    final service = _Guests();
+    var guests = <HouseGuest>[];
+    when(() => service.fetch('house')).thenAnswer((_) async => guests);
+    when(() => service.approve('7', any())).thenAnswer((_) async {
+      guests = [
+        const HouseGuest(id: '7', modes: {CasaShareMode.home}),
+      ];
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HouseGuestsPage(houseTag: 'house', service: service),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Non hai ancora accolto ospiti.'), findsOneWidget);
+    guests = [const HouseGuest(id: '7', pending: true, modes: {})];
+    await tester.pump(const Duration(seconds: 8));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Apri casa'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('house-share-home')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('house-share-confirm')));
+    await tester.pumpAndSettle();
+    verify(() => service.approve('7', {CasaShareMode.home})).called(1);
+    expect(find.byKey(const ValueKey('guest-7-home')), findsOneWidget);
+  });
   for (final size in [const Size(320, 640), const Size(1440, 900)]) {
     testWidgets('ospiti: layout e revoca/riattivazione a $size', (
       tester,
@@ -108,34 +138,36 @@ void main() {
         ..enableOverrides();
       addTearDown(harness.disableOverrides);
       final service = _Guests();
-      when(() => service.fetch('house')).thenAnswer(
-        (_) async => [
-          HouseGuest(
-            id: '1',
-            modes: {CasaShareMode.home},
-            honoo: Honoo.fromMap({
-              'id': 'honoo',
-              'text': 'La mia bussata',
-              'image_url': 'https://example.test/honoo.png',
-              'user_id': 'guest',
-            }),
+      var guests = [
+        HouseGuest(
+          id: '1',
+          modes: {CasaShareMode.home},
+          honoo: Honoo.fromMap({
+            'id': 'honoo',
+            'text': 'La mia bussata',
+            'image_url': 'https://example.test/honoo.png',
+            'user_id': 'guest',
+          }),
+        ),
+        const HouseGuest(
+          id: '2',
+          modes: {},
+          hinoo: HinooDraft(
+            pages: [
+              HinooSlide(
+                text: 'Un hinoo per entrare',
+                backgroundImage: 'https://example.test/hinoo.png',
+                isTextWhite: true,
+              ),
+            ],
           ),
-          const HouseGuest(
-            id: '2',
-            modes: {},
-            hinoo: HinooDraft(
-              pages: [
-                HinooSlide(
-                  text: 'Un hinoo per entrare',
-                  backgroundImage: 'https://example.test/hinoo.png',
-                  isTextWhite: true,
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-      when(() => service.update('1', any())).thenAnswer((_) async {});
+        ),
+      ];
+      when(() => service.fetch('house')).thenAnswer((_) async => guests);
+      when(() => service.update('1', any())).thenAnswer((invocation) async {
+        final modes = invocation.positionalArguments[1] as Set<CasaShareMode>;
+        guests = [for (final g in guests) g.id == '1' ? g.withModes(modes) : g];
+      });
       await tester.pumpWidget(
         MaterialApp(
           home: HouseGuestsPage(houseTag: 'house', service: service),

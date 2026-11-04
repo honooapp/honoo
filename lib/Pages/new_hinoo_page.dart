@@ -301,7 +301,8 @@ class _NewHinooPageState extends State<NewHinooPage>
     }
 
     final userId = SupabaseProvider.client.auth.currentUser?.id;
-    if (hinooDraft.type == HinooType.answer &&
+    if (!widget.returnSavedId &&
+        hinooDraft.type == HinooType.answer &&
         widget.replyTo?.isNotEmpty == true) {
       final selectedConversationId = await chooseReplyConversation(
         context: context,

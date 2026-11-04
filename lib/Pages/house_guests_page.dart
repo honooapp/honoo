@@ -1,4 +1,6 @@
+import 'dart:async';
 import '../Widgets/honoo_back_button.dart';
+import 'casa_share_selection_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -26,25 +28,75 @@ class _HouseGuestsPageState extends State<HouseGuestsPage> {
   final Set<String> _saving = {};
   bool _loading = true;
   bool _failed = false;
+  Timer? _refresh;
+  int _loadVersion = 0;
+  bool _fetching = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _refresh = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (!_fetching &&
+          !_loading &&
+          _saving.isEmpty &&
+          ModalRoute.of(context)?.isCurrent == true) {
+        unawaited(_load(silent: true));
+      }
+    });
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _failed = false;
-    });
+  @override
+  void dispose() {
+    _refresh?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    _fetching = true;
+    final version = ++_loadVersion;
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _failed = false;
+      });
+    }
     try {
       final guests = await _service.fetch(widget.houseTag);
-      if (mounted) setState(() => _guests = guests);
+      if (mounted && version == _loadVersion) {
+        setState(() {
+          _guests = guests;
+          _failed = false;
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() => _failed = true);
+      if (mounted && !silent && version == _loadVersion) {
+        setState(() => _failed = true);
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (version == _loadVersion) {
+        _fetching = false;
+        if (mounted) setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _approve(HouseGuest guest) async {
+    if (_saving.contains(guest.id)) return;
+    setState(() => _saving.add(guest.id));
+    try {
+      final modes = await Navigator.of(context).push<Set<CasaShareMode>>(
+        MaterialPageRoute(builder: (_) => const CasaShareSelectionPage()),
+      );
+      if (!mounted || modes == null || modes.isEmpty) return;
+      await _service.approve(guest.id, modes);
+      if (mounted) await _load();
+    } catch (_) {
+      if (mounted) {
+        showHonooToast(context, message: 'Casa non aperta. Ritenta.');
+      }
+    } finally {
+      if (mounted) setState(() => _saving.remove(guest.id));
     }
   }
 
@@ -55,12 +107,7 @@ class _HouseGuestsPageState extends State<HouseGuestsPage> {
     setState(() => _saving.add(guest.id));
     try {
       await _service.update(guest.id, modes);
-      if (!mounted) return;
-      setState(
-        () => _guests = _guests
-            .map((g) => g.id == guest.id ? g.withModes(modes) : g)
-            .toList(),
-      );
+      if (mounted) await _load();
     } catch (_) {
       if (mounted) {
         showHonooToast(context, message: 'Permessi non salvati. Ritenta.');
@@ -180,9 +227,11 @@ class _HouseGuestsPageState extends State<HouseGuestsPage> {
                         ),
                         const SizedBox(width: 8),
                         if (guest.pending)
-                          const Text(
-                            'Richiesta di accesso',
-                            style: TextStyle(color: Colors.white),
+                          TextButton(
+                            onPressed: _saving.contains(guest.id)
+                                ? null
+                                : () => _approve(guest),
+                            child: const Text('Apri casa'),
                           ),
                         if (!guest.pending)
                           for (final mode in CasaShareMode.values)

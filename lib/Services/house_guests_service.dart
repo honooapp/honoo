@@ -3,6 +3,7 @@ import '../Entities/casa_share_mode.dart';
 import '../Entities/hinoo.dart';
 import '../Entities/honoo.dart';
 import 'supabase_provider.dart';
+import 'campanelli_repository.dart';
 
 class HouseGuest {
   const HouseGuest({
@@ -77,6 +78,12 @@ class HouseGuestsService {
         .timeout(const Duration(seconds: 12));
     return (rows as List).whereType<Map>().map(HouseGuest.fromJson).toList();
   }
+
+  Future<void> approve(String id, Set<CasaShareMode> modes) =>
+      CampanelliDataRepository(client: _client).approveHouseKnock(
+        knockId: id,
+        shareModes: modes.map((m) => m.dbValue).toList(),
+      );
 
   Future<void> update(String id, Set<CasaShareMode> modes) async {
     await _client

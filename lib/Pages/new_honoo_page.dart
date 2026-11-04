@@ -193,7 +193,9 @@ class _NewHonooPageState extends State<NewHonooPage> {
     final HonooType type = widget.forcedType ?? HonooType.personal;
     // conversation: se risposta usa quella fornita; altrimenti genera una nuova
     String conversationId = widget.conversationId ?? const Uuid().v4();
-    if (type == HonooType.answer && widget.replyTo?.isNotEmpty == true) {
+    if (!widget.returnSavedId &&
+        type == HonooType.answer &&
+        widget.replyTo?.isNotEmpty == true) {
       if (!mounted) return false;
       final selectedConversationId = await chooseReplyConversation(
         context: context,
