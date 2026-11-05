@@ -202,8 +202,29 @@
       );
       let displayedProgress = 0;
       let targetProgress = 8;
+      let landingFailed = false;
+      let firstFrameRendered = false;
+      const showLandingError = () => {
+        if (firstFrameRendered || landingFailed) return;
+        landingFailed = true;
+        window.clearInterval(progressTimer);
+        window.clearTimeout(startupTimer);
+        document.getElementById('landing-loader-icon').hidden = true;
+        landingProgress.textContent = 'Impossibile avviare honoo. Controlla la connessione e riprova.';
+        landingProgress.style.lineHeight = '1.5';
+        landingProgress.style.maxWidth = 'min(90vw, 420px)';
+        const retry = document.createElement('button');
+        retry.textContent = 'Riprova';
+        retry.style.pointerEvents = 'auto';
+        retry.style.padding = '12px 24px';
+        retry.addEventListener('click', () => window.location.reload());
+        landingLoader.appendChild(retry);
+      };
+      const startupTimer = window.setTimeout(showLandingError, 60000);
+      window.honooShowLandingError = showLandingError;
 
       const setLandingProgress = (value, immediate = false) => {
+        if (landingFailed) return;
         targetProgress = Math.max(
           targetProgress,
           Math.min(100, Math.round(value)),
@@ -241,13 +262,17 @@
       window.addEventListener(
         'flutter-first-frame',
         () => {
+          firstFrameRendered = true;
+          window.clearTimeout(startupTimer);
           window.clearInterval(progressTimer);
+          landingFailed = false;
           setLandingProgress(100, true);
           window.setTimeout(() => landingLoader.classList.add('is-complete'), 90);
           window.setTimeout(() => {
             landingBackground.remove();
             landingLoader.remove();
             delete window.honooSetLandingProgress;
+            delete window.honooShowLandingError;
           }, 280);
         },
         { once: true },
@@ -273,6 +298,11 @@
           script.addEventListener(
             'load',
             () => window.honooSetLandingProgress?.(58),
+            { once: true },
+          );
+          script.addEventListener(
+            'error',
+            () => window.honooShowLandingError?.(),
             { once: true },
           );
           document.body.appendChild(script);
