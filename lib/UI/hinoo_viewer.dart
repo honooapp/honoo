@@ -373,7 +373,7 @@ class HinooSlideView extends StatelessWidget {
           if (downloadOverlay != null)
             Positioned(
               top: halfGap + actionInset,
-              right: actionInset,
+              right: actionInset + DownloadActionSpacing.of(context),
               child: downloadOverlay,
             ),
           if (halfGap > 0.05)

@@ -146,7 +146,7 @@ class HonooCard extends StatelessWidget {
                         if (onDownloadTap != null)
                           Positioned(
                             top: 6,
-                            right: 6,
+                            right: 6 + DownloadActionSpacing.of(context),
                             child: TextBoxDownloadButton(
                               onPressed: onDownloadTap!,
                               tooltip: 'download',

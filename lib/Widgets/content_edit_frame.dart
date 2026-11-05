@@ -56,7 +56,7 @@ class ContentEditFrame extends StatelessWidget {
         return Stack(
           fit: StackFit.expand,
           children: [
-            child,
+            DownloadActionSpacing(child: child),
             Align(
               alignment: Alignment.topCenter,
               child: SizedBox(width: width, child: controls),

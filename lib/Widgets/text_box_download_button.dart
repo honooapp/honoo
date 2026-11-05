@@ -1,6 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+/// Reserves space for the text-edit action overlaid on saved content.
+class DownloadActionSpacing extends InheritedWidget {
+  const DownloadActionSpacing({super.key, required super.child});
+
+  static double of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<DownloadActionSpacing>() !=
+          null
+      ? 38
+      : 0;
+
+  @override
+  bool updateShouldNotify(DownloadActionSpacing oldWidget) => false;
+}
+
 class TextBoxDownloadButton extends StatelessWidget {
   const TextBoxDownloadButton({
     super.key,
