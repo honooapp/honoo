@@ -406,6 +406,7 @@ void main() {
         'content_id': 'deleted-root',
         'conversation_id': 'conversation-1',
         'original_created_at': '2026-01-01T10:59:59Z',
+        'deleted_by_owner': true,
       },
     ]);
 
@@ -415,6 +416,7 @@ void main() {
 
     expect(result.map((entry) => entry.id), ['deleted-root', 'reply-1']);
     expect(result.first.kind, ConversationEntryKind.deleted);
+    expect(result.first.deletedByOwner, isTrue);
   });
 
   test('trasforma un contenuto soft-deleted in segnaposto', () async {

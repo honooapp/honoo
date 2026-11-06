@@ -11,6 +11,7 @@ class ConversationEntry {
   final String? id;
   final String? replyTo;
   final bool isFromMoonSaved;
+  final bool deletedByOwner;
   final DateTime createdAt;
 
   ConversationEntry._(
@@ -22,6 +23,7 @@ class ConversationEntry {
     this.id,
     this.replyTo,
     this.isFromMoonSaved = false,
+    this.deletedByOwner = false,
   });
 
   factory ConversationEntry.honoo(Honoo h) => ConversationEntry._(
@@ -55,8 +57,10 @@ class ConversationEntry {
   factory ConversationEntry.deleted({
     required String id,
     required DateTime createdAt,
+    bool deletedByOwner = false,
   }) => ConversationEntry._(
     ConversationEntryKind.deleted,
+    deletedByOwner: deletedByOwner,
     id: id,
     createdAt: createdAt,
   );

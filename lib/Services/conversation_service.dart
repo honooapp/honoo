@@ -36,7 +36,9 @@ class ConversationService {
       _allRows(
         () => _client
             .from('conversation_tombstones')
-            .select('content_id,conversation_id,original_created_at')
+            .select(
+              'content_id,conversation_id,original_created_at,deleted_by_owner',
+            )
             .eq('conversation_id', conversationId),
         idColumn: 'content_id',
       ),
@@ -135,6 +137,11 @@ class ConversationService {
               isFromMoonSaved: e.isFromMoonSaved,
             ),
             deleted: () => ConversationEntry.deleted(
+              deletedByOwner: tombstoneRows.any(
+                (row) =>
+                    row['content_id'] == e.id &&
+                    row['deleted_by_owner'] == true,
+              ),
               id: e.id ?? '',
               createdAt: e.createdAt,
             ),

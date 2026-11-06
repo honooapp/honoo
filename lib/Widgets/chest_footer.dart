@@ -75,6 +75,42 @@ class ChestFooter extends StatelessWidget {
       hinoo: (hinoo) => _addHinooActions(actions, hinoo),
     );
 
+    actions.removeWhere((action) => action.tooltip == 'Cancella');
+    final entry = selectedConversationEntry;
+    final selectedHonoo = entry == null ? item?.honoo : entry.honoo;
+    final selectedHinoo = entry == null
+        ? item?.hinoo
+        : entry.hinoo == null || entry.id == null
+        ? null
+        : ChestHinooItem(
+            id: entry.id!,
+            draft: entry.hinoo!,
+            createdAt: entry.createdAt,
+            isFromMoonSaved: entry.isFromMoonSaved,
+            ownerId: entry.ownerId,
+            conversationId: entry.hinoo!.conversationId,
+          );
+    // A foreign/deleted entry can still remove the thread from this user's chest.
+    if (isConversation && item != null) {
+      actions.add(
+        _deleteAction(() {
+          if (selectedHonoo != null) {
+            onDeleteHonoo(selectedHonoo);
+          } else if (selectedHinoo != null) {
+            onDeleteHinoo(selectedHinoo);
+          } else {
+            item!.when(honoo: onDeleteHonoo, hinoo: onDeleteHinoo);
+          }
+        }),
+      );
+    } else if (selectedHonoo != null &&
+        (isAdmin || _isMine(selectedHonoo.userId))) {
+      actions.add(_deleteAction(() => onDeleteHonoo(selectedHonoo)));
+    } else if (selectedHinoo != null &&
+        (isAdmin || _isMine(selectedHinoo.ownerId))) {
+      actions.add(_deleteAction(() => onDeleteHinoo(selectedHinoo)));
+    }
+
     final selectedEntry = selectedConversationEntry ?? _standaloneReplyEntry;
     if (selectedEntry != null) {
       actions.removeWhere((action) => action.tooltip == 'Rispondi');

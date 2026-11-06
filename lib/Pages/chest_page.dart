@@ -606,16 +606,31 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
   );
 
   String? _conversationIdForDeletion(ChestItem item) {
-    final explicitId = _convIdOfItem(item);
-    if (explicitId != null && explicitId.isNotEmpty) return explicitId;
+    if (_selectedConvEntry != null && _activeConversationId != null) {
+      return _activeConversationId;
+    }
     return item.when(
-      honoo: (honoo) => honoo.hasReplies ? honoo.dbId : null,
-      hinoo: (hinoo) {
-        final id = hinoo.id;
-        final hasActivity =
+      honoo: (h) {
+        final id = h.dbId;
+        final hasReplies =
+            h.hasReplies ||
             _honooLatestReplies.containsKey(id) ||
             _hinooLatestReplies.containsKey(id);
-        return hasActivity ? id : null;
+        final isReply =
+            !h.isFromMoonSaved &&
+            (h.replyTo?.isNotEmpty == true || h.type == HonooType.answer);
+        return hasReplies || isReply ? _convIdOfItem(item) : null;
+      },
+      hinoo: (h) {
+        final hasReplies =
+            _honooLatestReplies.containsKey(h.id) ||
+            _hinooLatestReplies.containsKey(h.id) ||
+            (_hinooRepliesByRoot[h.id]?.isNotEmpty ?? false);
+        final isReply =
+            !h.isFromMoonSaved &&
+            (h.draft.replyTo?.isNotEmpty == true ||
+                h.draft.type == HinooType.answer);
+        return hasReplies || isReply ? _convIdOfItem(item) : null;
       },
     );
   }
@@ -624,9 +639,6 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     final conversationId = _conversationIdForDeletion(item);
     final userId = SupabaseProvider.client.auth.currentUser?.id;
     if (conversationId == null || userId == null) return false;
-    if (!_isAdmin) {
-      throw StateError('Solo gli admin possono eliminare conversazioni.');
-    }
     await _chestRepository.hideConversation(
       userId: userId,
       conversationId: conversationId,
@@ -740,49 +752,98 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _deleteHonoo(Honoo honoo) async {
-    if (!_isAdmin &&
-        (honoo.userId != SupabaseProvider.client.auth.currentUser?.id ||
-            honoo.isFromMoonSaved == true ||
-            _selectedConvEntry != null ||
-            honoo.type == HonooType.answer ||
-            _conversationIdForDeletion(
-                  ChestItem.honoo(honoo, DateTime(1970)),
-                ) !=
-                null)) {
-      return;
+  Future<void> _deleteHonoo(Honoo honoo) => _deleteChestContent(
+    ChestItem.honoo(
+      honoo,
+      DateTime.tryParse(honoo.createdAt) ?? DateTime(1970),
+    ),
+  );
+
+  Future<void> _deleteChestContent(ChestItem item) async {
+    if (_isMutating) return;
+    final userId = SupabaseProvider.client.auth.currentUser?.id;
+    if (userId == null) return;
+    final ownerId = item.when(honoo: (h) => h.userId, hinoo: (h) => h.ownerId);
+    final conversationId = _conversationIdForDeletion(item);
+    final canDeleteContent =
+        (ownerId == userId || _isAdmin) &&
+        _selectedConvEntry?.kind != ConversationEntryKind.deleted;
+    bool? wholeConversation;
+    if (conversationId != null) {
+      wholeConversation = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Cosa vuoi eliminare?'),
+          content: const Text(
+            'Puoi rimuovere tutta la conversazione dal tuo scrigno. Se elimini solo la tua risposta, gli altri vedranno un avviso al suo posto.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Annulla'),
+            ),
+            if (canDeleteContent)
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Solo la mia risposta'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Tutta la conversazione'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || wholeConversation == null) return;
+    } else {
+      if (!canDeleteContent) return;
+      final confirmed = await showHonooDeleteDialog(
+        context,
+        target: item.honoo != null
+            ? HonooDeletionTarget.honoo
+            : HonooDeletionTarget.hinoo,
+      );
+      if (!mounted || confirmed != true) return;
     }
-    final confirmed = await showHonooDeleteDialog(
-      context,
-      target: HonooDeletionTarget.honoo,
-    );
-    if (!mounted || confirmed != true) return;
-    final String? id = honoo.dbId;
-    if (id == null || id.isEmpty) {
-      showHonooToast(context, message: 'Impossibile cancellare: id mancante.');
-      return;
-    }
+    if (_isMutating) return;
     setState(() => _isMutating = true);
     try {
-      if (await _hideConversationIfPresent(
-        ChestItem.honoo(
-          honoo,
-          DateTime.tryParse(honoo.createdAt) ?? DateTime(1970),
-        ),
-      )) {
+      if (wholeConversation == true) {
+        await _hideConversationIfPresent(item);
+      } else {
+        final id = item.when(honoo: (h) => h.dbId, hinoo: (h) => h.id);
+        if (id == null || id.isEmpty) throw StateError('Id mancante');
+        if (item.honoo != null) {
+          await ctrl.deleteHonooById(id);
+        } else {
+          await _chestRepository.deleteHinoo(id);
+          _chestController.removeHinoo(id);
+        }
         if (!mounted) return;
-        showHonooToast(context, message: 'Conversazione eliminata.');
-        return;
+        setState(() {
+          _selectedConvEntry = null;
+          _revealedConvEntry = null;
+          _selectedEntriesByConversation.clear();
+          _conversationRefreshToken++;
+          _lastRebuildSignature = null;
+        });
+        await _reconcileAll();
       }
-      await ctrl.deleteHonooById(id);
-      if (!mounted) return;
-      showHonooToast(context, message: 'honoo eliminato.');
+      if (mounted) {
+        showHonooToast(
+          context,
+          message: wholeConversation == true
+              ? 'Conversazione rimossa dal tuo scrigno.'
+              : 'Contenuto eliminato.',
+        );
+      }
     } catch (error) {
-      if (!mounted) return;
-      showHonooToast(
-        context,
-        message: 'Errore durante l\'eliminazione: $error',
-      );
+      if (mounted) {
+        showHonooToast(
+          context,
+          message: 'Errore durante l’eliminazione: $error',
+        );
+      }
     } finally {
       if (mounted) setState(() => _isMutating = false);
     }
@@ -865,41 +926,8 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _deleteHinoo(ChestHinooItem current) async {
-    if (!_isAdmin &&
-        (current.ownerId != SupabaseProvider.client.auth.currentUser?.id ||
-            current.isFromMoonSaved ||
-            _selectedConvEntry != null ||
-            current.draft.type == HinooType.answer ||
-            _conversationIdForDeletion(ChestItem.hinoo(current)) != null)) {
-      return;
-    }
-    final bool? confirmed = await showHonooDeleteDialog(
-      context,
-      target: HonooDeletionTarget.hinoo,
-    );
-    if (confirmed != true) return;
-
-    if (_isMutating) return;
-    setState(() => _isMutating = true);
-    try {
-      if (await _hideConversationIfPresent(ChestItem.hinoo(current))) {
-        if (!mounted) return;
-        showHonooToast(context, message: 'Conversazione eliminata.');
-        return;
-      }
-      await _chestRepository.deleteHinoo(current.id);
-
-      if (!mounted) return;
-      _chestController.removeHinoo(current.id);
-      showHonooToast(context, message: 'hinoo eliminato.');
-    } catch (e) {
-      if (!mounted) return;
-      showHonooToast(context, message: 'Errore durante l\'eliminazione: $e');
-    } finally {
-      if (mounted) setState(() => _isMutating = false);
-    }
-  }
+  Future<void> _deleteHinoo(ChestHinooItem current) =>
+      _deleteChestContent(ChestItem.hinoo(current));
 
   Future<void> _showReplyChoiceForHonoo(Honoo current) async {
     final _ReplyChoice? choice = await _showReplyChoice();

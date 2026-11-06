@@ -619,13 +619,18 @@ class _UnifiedThreadViewState extends State<UnifiedThreadView>
         );
         break;
       case ConversationEntryKind.deleted:
-        card = const ColoredBox(
+        card = ColoredBox(
           color: HonooColor.background,
           child: Center(
             child: Text(
-              'contenuto eliminato',
+              entry.deletedByOwner
+                  ? 'L’utente ha eliminato questa risposta.'
+                  : 'contenuto eliminato',
               textAlign: TextAlign.center,
-              style: TextStyle(color: HonooColor.onBackground, fontSize: 18),
+              style: const TextStyle(
+                color: HonooColor.onBackground,
+                fontSize: 18,
+              ),
             ),
           ),
         );

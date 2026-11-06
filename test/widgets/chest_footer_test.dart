@@ -90,6 +90,7 @@ void main() {
     ValueChanged<ConversationEntry>? onSendConversationEntryToMoon,
     Color foregroundColor = HonooColor.onBackground,
     bool isAdmin = false,
+    bool isConversation = false,
     VoidCallback? onOpenHouse,
     double width = 800,
     double iconSize = 40,
@@ -104,6 +105,7 @@ void main() {
                 item: item,
                 onOpenHouse: onOpenHouse,
                 isAdmin: isAdmin,
+                isConversation: isConversation,
                 selectedConversationEntry: selectedConversationEntry,
                 currentUserId: 'current-user',
                 iconSize: iconSize,
@@ -187,7 +189,16 @@ void main() {
       await pumpFooter(tester, item: item);
       final home = tester.getCenter(find.byTooltip('Home'));
       final info = tester.getCenter(find.byTooltip('Info'));
-      expectDisabled(tester, 'Cancella');
+      expect(
+        tester
+            .widget<IconButton>(
+              find.byWidgetPredicate(
+                (w) => w is IconButton && w.tooltip == 'Cancella',
+              ),
+            )
+            .onPressed,
+        isNotNull,
+      );
       final reply = Honoo(
         0,
         'reply',
@@ -213,27 +224,76 @@ void main() {
     },
   );
 
-  testWidgets('solo gli admin possono cancellare conversazioni Honoo e Hinoo', (
+  testWidgets(
+    'gli utenti cancellano i propri Honoo e Hinoo nelle conversazioni',
+    (tester) async {
+      for (final item in [
+        honooItem(HonooType.personal, conversationId: 'thread'),
+        honooItem(HonooType.personal, hasReplies: true),
+        hinooItem(conversationId: 'thread'),
+      ]) {
+        await pumpFooter(tester, item: item);
+        {
+          expect(
+            tester
+                .widget<IconButton>(
+                  find.byWidgetPredicate(
+                    (w) => w is IconButton && w.tooltip == 'Cancella',
+                  ),
+                )
+                .onPressed,
+            isNotNull,
+          );
+        }
+        var deleted = false;
+        await pumpFooter(
+          tester,
+          item: item,
+          isAdmin: true,
+          onDeleteHonoo: (_) => deleted = true,
+          onDeleteHinoo: (_) => deleted = true,
+        );
+        await tester.tap(find.byTooltip('Cancella'));
+        expect(deleted, isTrue);
+      }
+    },
+  );
+
+  testWidgets('Cancella usa la risposta Hinoo selezionata in un thread Honoo', (
     tester,
   ) async {
-    for (final item in [
-      honooItem(HonooType.personal, conversationId: 'thread'),
-      honooItem(HonooType.personal, hasReplies: true),
-      hinooItem(conversationId: 'thread'),
-    ]) {
-      await pumpFooter(tester, item: item);
-      expectDisabled(tester, 'Cancella');
-      var deleted = false;
-      await pumpFooter(
-        tester,
-        item: item,
-        isAdmin: true,
-        onDeleteHonoo: (_) => deleted = true,
-        onDeleteHinoo: (_) => deleted = true,
-      );
-      await tester.tap(find.byTooltip('Cancella'));
-      expect(deleted, isTrue);
-    }
+    String? deletedId;
+    final reply = hinooItem().hinoo!;
+    await pumpFooter(
+      tester,
+      item: honooItem(HonooType.personal),
+      isConversation: true,
+      selectedConversationEntry: ConversationEntry.hinoo(
+        reply.draft,
+        id: 'selected-reply',
+        ownerId: 'current-user',
+        createdAt: reply.createdAt,
+      ),
+      onDeleteHinoo: (h) => deletedId = h.id,
+    );
+    await tester.tap(find.byTooltip('Cancella'));
+    expect(deletedId, 'selected-reply');
+  });
+
+  testWidgets('Una risposta altrui permette la rimozione della conversazione', (
+    tester,
+  ) async {
+    Honoo? selected;
+    final reply = honooItem(HonooType.answer).honoo!;
+    await pumpFooter(
+      tester,
+      item: honooItem(HonooType.personal),
+      isConversation: true,
+      selectedConversationEntry: ConversationEntry.honoo(reply),
+      onDeleteHonoo: (h) => selected = h,
+    );
+    await tester.tap(find.byTooltip('Cancella'));
+    expect(selected, same(reply));
   });
 
   testWidgets('footer vuoto mostra subito Home e Info bianche', (tester) async {
