@@ -138,6 +138,17 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
   bool _didApplyInitialFocus = false;
   String? _detachedFocusedConversationId;
   bool _detachedConversationVisible = true;
+  bool get _hasDetachedConversation {
+    final id = widget.focusConversationId ?? _detachedFocusedConversationId;
+    return _initialLoadCompleted &&
+        id != null &&
+        id.isNotEmpty &&
+        !_itemsNormal.any((item) => _convIdOfItem(item) == id);
+  }
+
+  bool get _isDetachedConversationVisible =>
+      _hasDetachedConversation && _detachedConversationVisible;
+
   bool _initialLoadCompleted = false;
   bool _authResolved = false;
   int _conversationRefreshToken = 0;
@@ -193,7 +204,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
   ) {
     if (conversationId != null) {
       _selectedEntriesByConversation[conversationId] = entry;
-      final visibleConversationId = _detachedConversationVisible
+      final visibleConversationId = _isDetachedConversationVisible
           ? widget.focusConversationId ?? _detachedFocusedConversationId
           : _itemsNormal.isEmpty
           ? null
@@ -367,7 +378,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
       ctrl.version.value.toString(),
       ..._hinoo.map(
         (item) =>
-            '${item.id}:${item.createdAt.toIso8601String()}:${item.conversationId ?? item.draft.conversationId ?? ''}',
+            '${item.id}:${item.isOnMoon}:${item.createdAt.toIso8601String()}:${item.conversationId ?? item.draft.conversationId ?? ''}',
       ),
       ..._sortedActivitySignature('honoo', _honooLatestReplies),
       ..._sortedActivitySignature('hinoo', _hinooLatestReplies),
@@ -511,7 +522,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
       }
       final indexChanged = desiredIndex != _currentIndex;
       _currentIndex = desiredIndex;
-      final visibleConversationId = _detachedConversationVisible
+      final visibleConversationId = _isDetachedConversationVisible
           ? widget.focusConversationId ?? _detachedFocusedConversationId
           : _itemsNormal.isEmpty
           ? null
@@ -521,7 +532,11 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
       if (indexChanged) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || _itemsNormal.isEmpty) return;
-          _carouselController.jumpToPage(_currentIndex);
+          _carouselController.jumpToPage(
+            _isDetachedConversationVisible
+                ? 0
+                : _currentIndex + (_hasDetachedConversation ? 1 : 0),
+          );
         });
       }
     }
@@ -650,7 +665,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     required double bottomPadding,
     required Color foregroundColor,
   }) {
-    final conversationId = _detachedConversationVisible
+    final conversationId = _isDetachedConversationVisible
         ? _detachedFocusedConversationId ??
               widget.focusConversationId ??
               (item == null ? null : _convIdOfItem(item))
@@ -1278,18 +1293,8 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
         final items = _itemsNormal;
         final focusedConversationId =
             widget.focusConversationId ?? _detachedFocusedConversationId;
-        final focusedItemIndex = focusedConversationId == null
-            ? -1
-            : items.indexWhere(
-                (item) => _convIdOfItem(item) == focusedConversationId,
-              );
-        final showDetachedFocusedConversation =
-            _initialLoadCompleted &&
-            focusedConversationId != null &&
-            focusedConversationId.isNotEmpty &&
-            focusedItemIndex < 0;
-        final detachedConversationVisible =
-            showDetachedFocusedConversation && _detachedConversationVisible;
+        final showDetachedFocusedConversation = _hasDetachedConversation;
+        final detachedConversationVisible = _isDetachedConversationVisible;
         final currentItem = detachedConversationVisible || items.isEmpty
             ? null
             : items[_currentIndex.clamp(0, items.length - 1)];
@@ -1403,7 +1408,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
                   return UnifiedThreadView(
                     key: ValueKey('detached:$focusedConversationId'),
                     onReveal: _setRevealedEntry,
-                    conversationId: focusedConversationId,
+                    conversationId: focusedConversationId!,
                     maxWidth: viewW,
                     maxHeight: availableH,
                     isActive: detachedConversationVisible,
