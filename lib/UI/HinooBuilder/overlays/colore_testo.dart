@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class ColoreTestoOverlay extends StatelessWidget {
-  const ColoreTestoOverlay({
-    super.key,
-    required this.onPick,
-  });
+  const ColoreTestoOverlay({super.key, required this.onPick});
 
   final ValueChanged<Color> onPick;
 
@@ -49,15 +46,32 @@ class _ColorDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 2),
+    return Tooltip(
+      message: color == Colors.white ? 'Testo bianco' : 'Testo nero',
+      child: Semantics(
+        button: true,
+        label: color == Colors.white ? 'Testo bianco' : 'Testo nero',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: color == Colors.white ? Colors.black : Colors.white,
+                  width: 3,
+                ),
+                boxShadow: const [
+                  BoxShadow(color: Colors.grey, spreadRadius: 2),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

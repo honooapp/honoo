@@ -459,6 +459,13 @@ class _HinooBuilderState extends State<HinooBuilder> {
       _downloadHinoo(baseName: baseName);
   Future<void> replaceBackgroundPublic() => _pickAndUploadBackground();
   void confirmBackgroundPublic() => _confirmBgAndLock();
+  void editTextColorPublic() {
+    if (!_bgChosen || _isUploadingBg) return;
+    _textFocus.unfocus();
+    setState(() => _step = _WizardStep.pickColor);
+    _notifyChanged();
+  }
+
   void editTextPublic() {
     setState(() => _step = _WizardStep.writeText);
     _textFocus.requestFocus();
@@ -639,6 +646,7 @@ class _HinooBuilderState extends State<HinooBuilder> {
                 }
                 _step = _WizardStep.writeText;
               });
+              _scheduleAutosave();
               FocusScope.of(context).requestFocus(_textFocus);
               _notifyChanged();
             },

@@ -54,6 +54,24 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    final dynamic builder = tester.state(find.byType(HinooBuilder));
+    final beforeColor = Map<String, dynamic>.from(builder.exportDraft());
+    await tester.tap(find.byKey(const Key('hinoo-edit-text-color')));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Testo bianco'), findsOneWidget);
+    expect(find.byTooltip('Testo nero'), findsOneWidget);
+    await tester.tap(find.byTooltip('Testo nero'));
+    await tester.pumpAndSettle();
+    final afterColor = builder.exportDraft();
+    expect(afterColor['textColor'], Colors.black.toARGB32());
+    expect(afterColor['text'], beforeColor['text']);
+    expect(afterColor['bgUrl'], beforeColor['bgUrl']);
+    expect(afterColor['bgTransform'], beforeColor['bgTransform']);
+    await tester.tap(find.byKey(const Key('hinoo-edit-text-color')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Testo bianco'));
+    await tester.pumpAndSettle();
+    expect(builder.exportDraft()['textColor'], Colors.white.toARGB32());
     final action = tester
         .widgetList<ResponsiveFooterBar>(find.byType(ResponsiveFooterBar))
         .expand((bar) => bar.actions)

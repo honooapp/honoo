@@ -763,6 +763,18 @@ class _NewHinooPageState extends State<NewHinooPage>
                   tooltip: 'Modifica immagine',
                   asset: 'assets/icons/immagine.svg',
                 ),
+                IconButton(
+                  key: const Key('hinoo-edit-text-color'),
+                  tooltip: 'Colore del testo',
+                  color: HonooColor.onBackground,
+                  onPressed: _hasBackground && !_bgUploadInProgress
+                      ? () {
+                          final dynamic builder = _builderKey.currentState;
+                          builder?.editTextColorPublic();
+                        }
+                      : null,
+                  icon: const Icon(Icons.contrast),
+                ),
                 TextBoxDownloadButton(
                   key: const Key('hinoo-edit-text'),
                   onPressed: _beginCampanelloTextEdit,
