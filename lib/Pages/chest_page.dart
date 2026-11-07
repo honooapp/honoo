@@ -138,11 +138,13 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
   bool _didApplyInitialFocus = false;
   String? _detachedFocusedConversationId;
   bool _detachedConversationVisible = true;
+  final Set<String> _removedConversationIds = {};
   bool get _hasDetachedConversation {
     final id = widget.focusConversationId ?? _detachedFocusedConversationId;
     return _initialLoadCompleted &&
         id != null &&
         id.isNotEmpty &&
+        !_removedConversationIds.contains(id) &&
         !_itemsNormal.any((item) => _convIdOfItem(item) == id);
   }
 
@@ -605,7 +607,11 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     },
   );
 
-  String? _conversationIdForDeletion(ChestItem item) {
+  String? _conversationIdForDeletion(ChestItem? item) {
+    if (_isDetachedConversationVisible) {
+      return _detachedFocusedConversationId ?? widget.focusConversationId;
+    }
+    if (item == null) return null;
     if (_selectedConvEntry != null && _activeConversationId != null) {
       return _activeConversationId;
     }
@@ -635,7 +641,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     );
   }
 
-  Future<bool> _hideConversationIfPresent(ChestItem item) async {
+  Future<bool> _hideConversationIfPresent(ChestItem? item) async {
     final conversationId = _conversationIdForDeletion(item);
     final userId = SupabaseProvider.client.auth.currentUser?.id;
     if (conversationId == null || userId == null) return false;
@@ -649,6 +655,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
         _selectedConvEntry = null;
         _revealedConvEntry = null;
         _detachedConversationVisible = false;
+        _removedConversationIds.add(conversationId);
         _lastRebuildSignature = null;
       });
     }
@@ -701,8 +708,8 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
               : null,
           item: item,
           isAdmin: _isAdmin,
-          isConversation:
-              item != null && _conversationIdForDeletion(item) != null,
+          isConversation: _conversationIdForDeletion(item) != null,
+          onDeleteConversation: () => _deleteChestContent(null),
           selectedConversationEntry: _selectedConvEntry,
           currentUserId: SupabaseProvider.client.auth.currentUser?.id,
           iconSize: iconSize,
@@ -759,13 +766,14 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
     ),
   );
 
-  Future<void> _deleteChestContent(ChestItem item) async {
+  Future<void> _deleteChestContent(ChestItem? item) async {
     if (_isMutating) return;
     final userId = SupabaseProvider.client.auth.currentUser?.id;
     if (userId == null) return;
-    final ownerId = item.when(honoo: (h) => h.userId, hinoo: (h) => h.ownerId);
+    final ownerId = item?.when(honoo: (h) => h.userId, hinoo: (h) => h.ownerId);
     final conversationId = _conversationIdForDeletion(item);
     final canDeleteContent =
+        item != null &&
         (ownerId == userId || _isAdmin) &&
         _selectedConvEntry?.kind != ConversationEntryKind.deleted;
     bool? wholeConversation;
@@ -811,7 +819,7 @@ class _ChestPageState extends State<ChestPage> with WidgetsBindingObserver {
       if (wholeConversation == true) {
         await _hideConversationIfPresent(item);
       } else {
-        final id = item.when(honoo: (h) => h.dbId, hinoo: (h) => h.id);
+        final id = item!.when(honoo: (h) => h.dbId, hinoo: (h) => h.id);
         if (id == null || id.isEmpty) throw StateError('Id mancante');
         if (item.honoo != null) {
           await ctrl.deleteHonooById(id);

@@ -30,9 +30,11 @@ class ChestFooter extends StatelessWidget {
     this.isAdmin = false,
     this.isConversation = false,
     this.onOpenHouse,
+    this.onDeleteConversation,
   });
 
   final VoidCallback? onOpenHouse;
+  final VoidCallback? onDeleteConversation;
   final bool isAdmin;
   final bool isConversation;
   final ChestItem? item;
@@ -91,15 +93,17 @@ class ChestFooter extends StatelessWidget {
             conversationId: entry.hinoo!.conversationId,
           );
     // A foreign/deleted entry can still remove the thread from this user's chest.
-    if (isConversation && item != null) {
+    if (isConversation) {
       actions.add(
         _deleteAction(() {
           if (selectedHonoo != null) {
             onDeleteHonoo(selectedHonoo);
           } else if (selectedHinoo != null) {
             onDeleteHinoo(selectedHinoo);
-          } else {
+          } else if (item != null) {
             item!.when(honoo: onDeleteHonoo, hinoo: onDeleteHinoo);
+          } else {
+            onDeleteConversation?.call();
           }
         }),
       );

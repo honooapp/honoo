@@ -92,6 +92,7 @@ void main() {
     bool isAdmin = false,
     bool isConversation = false,
     VoidCallback? onOpenHouse,
+    VoidCallback? onDeleteConversation,
     double width = 800,
     double iconSize = 40,
   }) async {
@@ -104,6 +105,7 @@ void main() {
               child: ChestFooter(
                 item: item,
                 onOpenHouse: onOpenHouse,
+                onDeleteConversation: onDeleteConversation,
                 isAdmin: isAdmin,
                 isConversation: isConversation,
                 selectedConversationEntry: selectedConversationEntry,
@@ -295,6 +297,25 @@ void main() {
     await tester.tap(find.byTooltip('Cancella'));
     expect(selected, same(reply));
   });
+
+  testWidgets(
+    'La conversazione aperta da notifica si elimina anche su un segnaposto',
+    (tester) async {
+      var deleted = false;
+      await pumpFooter(
+        tester,
+        item: null,
+        isConversation: true,
+        selectedConversationEntry: ConversationEntry.deleted(
+          id: 'deleted',
+          createdAt: DateTime(2026),
+        ),
+        onDeleteConversation: () => deleted = true,
+      );
+      await tester.tap(find.byTooltip('Cancella'));
+      expect(deleted, isTrue);
+    },
+  );
 
   testWidgets('footer vuoto mostra subito Home e Info bianche', (tester) async {
     await pumpFooter(tester, item: null);
